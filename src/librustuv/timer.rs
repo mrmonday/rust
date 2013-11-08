@@ -168,4 +168,24 @@ mod test {
         timer.sleep(1);
         timer.sleep(1);
     }
+
+    #[test] #[should_fail]
+    fn oneshot_fail() {
+        let mut timer = TimerWatcher::new(local_loop());
+        let _port = timer.oneshot(1);
+        fail!();
+    }
+
+    #[test] #[should_fail]
+    fn period_fail() {
+        let mut timer = TimerWatcher::new(local_loop());
+        let _port = timer.period(1);
+        fail!();
+    }
+
+    #[test] #[should_fail]
+    fn normal_fail() {
+        let _timer = TimerWatcher::new(local_loop());
+        fail!();
+    }
 }

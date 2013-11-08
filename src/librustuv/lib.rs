@@ -169,7 +169,7 @@ impl ForbidUnwind {
 impl Drop for ForbidUnwind {
     fn drop(&mut self) {
         assert!(self.failing_before == task::failing(),
-                "failing sadface {}", self.msg);
+                "didnt want an unwind during: {}", self.msg);
     }
 }
 
