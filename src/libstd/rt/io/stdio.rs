@@ -31,57 +31,35 @@ use libc;
 use option::{Option, Some, None};
 use result::{Ok, Err};
 use rt::io::buffered::LineBufferedWriter;
-use rt::rtio::{IoFactory, RtioTTY, RtioFileStream, with_local_io,
-               CloseAsynchronously};
-use super::{Reader, Writer, io_error, IoError, OtherIoError};
+use rt::rtio::{IoFactory, RtioTTY, RtioFileStream, with_local_io, DontClose};
+use super::{Reader, Writer, io_error, IoError, OtherIoError,
+            standard_error, EndOfFile};
 
-// And so begins the tale of acquiring a uv handle to a stdio stream on all
-// platforms in all situations. Our story begins by splitting the world into two
-// categories, windows and unix. Then one day the creators of unix said let
-// there be redirection! And henceforth there was redirection away from the
-// console for standard I/O streams.
+// A stdio source is frequently connected to a terminal (tty), but it's also
+// commonly redirected elsewhere. Right now libuv has questionable support for
+// using a stdio source as a tty handle when it's actually piped elsewhere, so
+// we have this enum for delegating what the underlying handle is being used as.
 //
-// After this day, the world split into four factions:
+// For now this is fine, as the only real reason for having a tty distinction is
+// to provide some nice extra features (like terminal dimensions), and piped
+// streams don't have that anyway.
 //
-// 1. Unix with stdout on a terminal.
-// 2. Unix with stdout redirected.
-// 3. Windows with stdout on a terminal.
-// 4. Windows with stdout redirected.
-//
-// Many years passed, and then one day the nation of libuv decided to unify this
-// world. After months of toiling, uv created three ideas: TTY, Pipe, File.
-// These three ideas propagated throughout the lands and the four great factions
-// decided to settle among them.
-//
-// The groups of 1, 2, and 3 all worked very hard towards the idea of TTY. Upon
-// doing so, they even enhanced themselves further then their Pipe/File
-// brethren, becoming the dominant powers.
-//
-// The group of 4, however, decided to work independently. They abandoned the
-// common TTY belief throughout, and even abandoned the fledgling Pipe belief.
-// The members of the 4th faction decided to only align themselves with File.
-//
-// tl;dr; TTY works on everything but when windows stdout is redirected, in that
-//        case pipe also doesn't work, but magically file does!
+// The good news is that if stdio is on a terminal, tty always works. If stdio
+// is not on a terminal, then a file stream always works. Yay!
 enum StdSource {
     TTY(~RtioTTY),
     File(~RtioFileStream),
 }
 
-#[fixed_stack_segment] #[inline(never)]
 fn src<T>(fd: libc::c_int, readable: bool, f: &fn(StdSource) -> T) -> T {
+    // it's understood that the file descriptor passed to these functions will
+    // *not* be closed when these I/O objects go out of scope. Otherwise, only
+    // sadness would ensue.
     do with_local_io |io| {
-        let fd = unsafe { libc::dup(fd) };
         match io.tty_open(fd, readable) {
             Ok(tty) => Some(f(TTY(tty))),
             Err(_) => {
-                // It's not really that desirable if these handles are closed
-                // synchronously, and because they're squirreled away in a task
-                // structure the destructors will be run when the task is
-                // attempted to get destroyed. This means that if we run a
-                // synchronous destructor we'll attempt to do some scheduling
-                // operations which will just result in sadness.
-                Some(f(File(io.fs_from_raw_fd(fd, CloseAsynchronously))))
+                Some(f(File(io.fs_from_raw_fd(fd, DontClose))))
             }
         }
     }.unwrap()
@@ -203,6 +181,17 @@ impl Reader for StdReader {
             File(ref mut file) => file.read(buf).map(|i| i as uint),
         };
         match ret {
+            // It appears that libuv will return 0-length reads for a stdio file
+            // handle when the file is positioned at EOF. When we open normal
+            // files, this doesn't happen, so it probably has to do with the
+            // handle being more of a pipe rather than something else.
+            // Regardless, translate 0-length reads of a stdio handle to an EOF
+            // notice rather than returning 0. Returning 0 will simply
+            // infinitely return 0 until the end of time (not good).
+            Ok(0) => {
+                io_error::cond.raise(standard_error(EndOfFile));
+                None
+            }
             Ok(amt) => Some(amt as uint),
             Err(e) => {
                 io_error::cond.raise(e);
