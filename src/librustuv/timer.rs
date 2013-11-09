@@ -100,7 +100,8 @@ impl RtioTimer for TimerWatcher {
     }
 }
 
-extern fn timer_cb(handle: *uvll::uv_timer_t, _status: c_int) {
+extern fn timer_cb(handle: *uvll::uv_timer_t, status: c_int) {
+    assert_eq!(status, 0);
     let timer: &mut TimerWatcher = unsafe { UvHandle::from_uv_handle(&handle) };
 
     match timer.action.take_unwrap() {
@@ -118,16 +119,24 @@ extern fn timer_cb(handle: *uvll::uv_timer_t, _status: c_int) {
 
 impl Drop for TimerWatcher {
     fn drop(&mut self) {
-        let _m = self.fire_homing_missile();
-        self.action = None;
-        self.stop();
-        self.close_async_();
+        // note that this drop is a little subtle. Dropping a channel which is
+        // held internally may invoke some scheduling operations. We can't take
+        // the channel unless we're on the home scheduler, but once we're on the
+        // home scheduler we should never move. Hence, we take the timer's
+        // action item and then move it outside of the homing block.
+        let _action = {
+            let _m = self.fire_homing_missile();
+            self.stop();
+            self.close_async_();
+            self.action.take()
+        };
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::cell::Cell;
     use std::rt::rtio::RtioTimer;
     use super::super::local_loop;
 
@@ -187,5 +196,19 @@ mod test {
     fn normal_fail() {
         let _timer = TimerWatcher::new(local_loop());
         fail!();
+    }
+
+    #[test]
+    fn closing_channel_during_drop_doesnt_kill_everything() {
+        // see issue #10375
+        let mut timer = TimerWatcher::new(local_loop());
+        let timer_port = Cell::new(timer.period(1000));
+
+        do spawn {
+            timer_port.take().try_recv();
+        }
+
+        // when we drop the TimerWatcher we're going to destroy the channel,
+        // which must wake up the task on the other end
     }
 }
