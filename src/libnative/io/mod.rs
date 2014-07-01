@@ -23,6 +23,8 @@
 
 #![allow(non_snake_case_functions)]
 
+extern crate netsupport;
+
 use libc::c_int;
 use libc;
 use std::c_str::CString;
@@ -112,22 +114,24 @@ fn mkerr_winbool(ret: libc::c_int) -> IoResult<()> {
 
 #[cfg(windows)]
 #[inline]
-fn retry(f: || -> libc::c_int) -> libc::c_int {
+fn retry<T:Signed + FromPrimitive>(f: || -> T) -> T {
     loop {
-        match f() {
-            -1 if os::errno() as int == libc::WSAEINTR as int => {}
-            n => return n,
+        let minus1: T = from_i32(-1).unwrap();
+        let ret = f();
+        if ret != minus1 || os::errno() as int != libc::WSAEINTR as int {
+            return ret
         }
     }
 }
 
 #[cfg(unix)]
 #[inline]
-fn retry(f: || -> libc::c_int) -> libc::c_int {
+fn retry<T:Signed + FromPrimitive>(f: || -> T) -> T {
     loop {
-        match f() {
-            -1 if os::errno() as int == libc::EINTR as int => {}
-            n => return n,
+        let minus1: T = from_i32(-1).unwrap();
+        let ret = f();
+        if ret != minus1 || os::errno() as int != libc::EINTR as int {
+            return ret
         }
     }
 }
@@ -202,6 +206,9 @@ impl rtio::IoFactory for IoFactory {
         -> IoResult<Vec<rtio::AddrinfoInfo>>
     {
         addrinfo::GetAddrInfoRequest::run(host, servname, hint)
+    }
+    fn raw_socket_new(&mut self, protocol: Protocol) -> IoResult<Box<rtio::RtioRawSocket>> {
+        net::RawSocket::new(protocol).map(|r| box r as Box<rtio::RtioRawSocket>)
     }
 
     // filesystem operations

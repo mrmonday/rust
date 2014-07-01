@@ -201,6 +201,7 @@ pub trait IoFactory {
     fn get_host_addresses(&mut self, host: Option<&str>, servname: Option<&str>,
                           hint: Option<AddrinfoHint>)
                           -> IoResult<Vec<AddrinfoInfo>>;
+    fn raw_socket_new(&mut self, protocol: Protocol) -> Result<Box<RtioRawSocket>, IoError>;
 
     // filesystem operations
     fn fs_from_raw_fd(&mut self, fd: c_int, close: CloseBehavior)
@@ -288,6 +289,11 @@ pub trait RtioUdpSocket : RtioSocket {
     fn set_timeout(&mut self, timeout_ms: Option<u64>);
     fn set_read_timeout(&mut self, timeout_ms: Option<u64>);
     fn set_write_timeout(&mut self, timeout_ms: Option<u64>);
+}
+
+pub trait RtioRawSocket {
+    fn recvfrom(&mut self, buf: &mut [u8]) -> Result<(uint, Option<Box<NetworkAddress>>), IoError>;
+    fn sendto(&mut self, buf: &[u8], dst: Box<NetworkAddress>) -> Result<uint, IoError>;
 }
 
 pub trait RtioTimer {

@@ -122,6 +122,7 @@
 #[cfg(test)] extern crate green;
 #[cfg(test)] extern crate debug;
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
+#[cfg(test)] extern crate netsupport;
 
 extern crate alloc;
 extern crate core;
@@ -264,17 +265,24 @@ mod failure;
 #[doc(hidden)]
 mod std {
     // mods used for deriving
+    pub use cast;
     pub use clone;
     pub use cmp;
     pub use hash;
 
     pub use comm; // used for select!()
+    pub use container;
     pub use fmt; // used for any formatting strings
     pub use io; // used for println!()
+    pub use iter;
     pub use local_data; // used for local_data_key!()
+    pub use num;
     pub use option; // used for bitflags!()
+    pub use prelude;
+    pub use result;
     pub use rt; // used for fail!()
     pub use vec; // used for vec![]
+    pub use vec_ng;
 
     // The test runner calls ::std::os::args() but really wants realstd
     #[cfg(test)] pub use os = realstd::os;
