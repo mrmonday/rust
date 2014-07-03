@@ -755,7 +755,7 @@ pub mod types {
             pub mod bsd44 {
             }
             pub mod extra {
-                use libc::types::os::arch::c95::{c_ushort, c_int, c_uchar};
+                use types::os::arch::c95::{c_ushort, c_int, c_uchar};
                 pub struct sockaddr_ll {
                     pub sll_family: c_ushort,
                     pub sll_protocol: c_ushort,
@@ -1382,7 +1382,7 @@ pub mod types {
             }
 
             pub mod bsd44 {
-                use types::common::c95::{c_void}
+                use types::common::c95::{c_void};
                 use types::os::arch::c95::{c_char, c_int, c_uint};
 
                 pub type socklen_t = c_int;
@@ -4107,7 +4107,7 @@ pub mod funcs {
         }
 
         pub mod net {
-            use libc::types::os::arch::c95::{c_char, c_uint};
+            use types::os::arch::c95::{c_char, c_uint};
 
             extern {
                 pub fn if_nametoindex(ifname: *c_char) -> c_uint;
