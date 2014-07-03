@@ -10,6 +10,7 @@
 
 use alloc::arc::Arc;
 use libc;
+use std::intrinsics;
 use std::mem;
 use std::rt::mutex;
 use std::rt::rtio;
@@ -742,32 +743,37 @@ impl rtio::RtioUdpSocket for UdpSocket {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Raw socket
+/// Arbitrary sockets
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO This needs a massive cleanup akin to Tcp/UdpSocket
-pub struct RawSocket {
-    priv fd: sock_t,
+#[cfg(windows)]
+pub fn net_buflen(buf: &[u8]) -> i32 {
+    buf.len() as i32
 }
 
-impl RawSocket {
-    pub fn new(protocol: raw::Protocol) -> IoResult<RawSocket>
+#[cfg(not(windows))]
+pub fn net_buflen(buf: &[u8]) -> u64 {
+    buf.len() as u64
+}
+
+
+// TODO This needs a massive cleanup akin to Tcp/UdpSocket
+pub struct Socket {
+    fd: sock_t,
+    close_on_drop: bool
+}
+
+impl Socket {
+    pub fn new(sock: libc::c_int, close_on_drop: bool) -> IoResult<Socket>
     {
-        let (domain, typ, proto) = netsupport::protocol_to_libc(protocol);
-        let sock = unsafe { libc::socket(domain, typ, proto) };
-        if sock == -1 {
-            return Err(netsupport::last_error());
-        }
-
-        let socket = RawSocket { fd: sock };
-
+        let socket = Socket { fd: sock, close_on_drop: close_on_drop };
         return Ok(socket);
     }
 }
 
-impl rtio::RtioRawSocket for RawSocket {
+impl rtio::RtioCustomSocket for Socket {
     fn recvfrom(&mut self, buf: &mut [u8])
-        -> IoResult<(uint, Option<~raw::NetworkAddress>)>
+        -> IoResult<(uint, *libc::sockaddr)>
     {
         let mut caddr: libc::sockaddr_storage = unsafe { intrinsics::init() };
         let mut caddrlen = unsafe {
@@ -777,44 +783,44 @@ impl rtio::RtioRawSocket for RawSocket {
                     let addr = &mut caddr as *mut libc::sockaddr_storage;
                     retry( || libc::recvfrom(self.fd,
                                    buf.as_ptr() as *mut libc::c_void,
-                                   netsupport::net_buflen(buf),
+                                   net_buflen(buf),
                                    0,
                                    addr as *mut libc::sockaddr,
                                    &mut caddrlen))
                   };
         if len == -1 {
-            return Err(netsupport::last_error());
+            return Err(last_error());
         }
 
-        return Ok((len as uint, netsupport::sockaddr_to_network_addr(
-            (&caddr as *libc::sockaddr_storage) as *libc::sockaddr, true)
-        ));
+        return Ok((len as uint, unsafe { intrinsics::transmute(&caddr) }));
     }
 
-    fn sendto(&mut self, buf: &[u8], dst: ~raw::NetworkAddress)
+    fn sendto(&mut self, buf: &[u8], addr: *libc::sockaddr, slen: uint)
         -> IoResult<uint>
     {
-        let (sockaddr, slen) = netsupport::network_addr_to_sockaddr(dst);
-        let addr = (&sockaddr as *libc::sockaddr_storage) as *libc::sockaddr;
         let len = unsafe {
                     retry( || libc::sendto(self.fd,
                                  buf.as_ptr() as *libc::c_void,
-                                 netsupport::net_buflen(buf),
+                                 net_buflen(buf),
                                  0,
                                  addr,
                                  slen as libc::socklen_t))
                   };
 
         return if len < 0 {
-            Err(netsupport::last_error())
+            Err(last_error())
         } else {
             Ok(len as uint)
         };
     }
 }
 
-impl Drop for RawSocket {
-    fn drop(&mut self) { unsafe { close(self.fd) } }
+impl Drop for Socket {
+    fn drop(&mut self) {
+        if self.close_on_drop {
+            unsafe { close(self.fd) }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

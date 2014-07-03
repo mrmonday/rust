@@ -176,11 +176,9 @@ impl IoFactory for UvIoFactory {
         r.map_err(uv_error_to_io_error)
     }
 
-    fn raw_socket_new(&mut self, protocol: Protocol) -> Result<Box<rtio::RtioRawSocket>, IoError> {
-        RawSocketWatcher::new(self, protocol)
-            .map(|rsw| box rsw as Box<rtio::RtioRawSocket>)
+    fn socket_from_raw_fd(&mut self, fd: c_int) -> IoResult<Box<rtio::RtioSocket + Send>> {
+        SocketWatcher::new(self, fd).map(|sw| box fd as Box<rtio::RtioSocket + Send>);
     }
-
 
     fn fs_from_raw_fd(&mut self, fd: c_int, close: rtio::CloseBehavior)
                       -> Box<rtio::RtioFileStream + Send> {

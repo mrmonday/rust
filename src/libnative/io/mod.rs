@@ -23,11 +23,10 @@
 
 #![allow(non_snake_case_functions)]
 
-extern crate netsupport;
-
 use libc::c_int;
 use libc;
 use std::c_str::CString;
+use std::num::from_i32;
 use std::os;
 use std::rt::rtio;
 use std::rt::rtio::{IoResult, IoError};
@@ -207,8 +206,13 @@ impl rtio::IoFactory for IoFactory {
     {
         addrinfo::GetAddrInfoRequest::run(host, servname, hint)
     }
-    fn raw_socket_new(&mut self, protocol: Protocol) -> IoResult<Box<rtio::RtioRawSocket>> {
-        net::RawSocket::new(protocol).map(|r| box r as Box<rtio::RtioRawSocket>)
+    fn socket_from_raw_fd(&mut self, fd: c_int, close: rtio::CloseBehavior) -> IoResult<Box<rtio::RtioCustomSocket + Send>> {
+        let close = match close {
+            rtio::CloseSynchronously | rtio::CloseAsynchronously => true,
+            rtio::DontClose => false
+        };
+
+        net::Socket::new(fd, close).map(|s| box s as Box<rtio::RtioCustomSocket + Send>)
     }
 
     // filesystem operations

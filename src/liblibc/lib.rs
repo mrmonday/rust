@@ -460,13 +460,13 @@ pub mod types {
                 }
 
                 pub struct ifaddrs {
-                    pub ifa_next: *ifaddrs,
-                    pub ifa_name: *c_char,
+                    pub ifa_next: *mut ifaddrs,
+                    pub ifa_name: *mut c_char,
                     pub ifa_flags: c_uint,
-                    pub ifa_addr: *sockaddr,
-                    pub ifa_netmask: *sockaddr,
-                    pub ifa_ifu: *sockaddr, // FIXME This should be a union
-                    pub ifa_data: *c_void
+                    pub ifa_addr: *mut sockaddr,
+                    pub ifa_netmask: *mut sockaddr,
+                    pub ifa_ifu: *mut sockaddr, // FIXME This should be a union
+                    pub ifa_data: *mut c_void
                 }
 
             }
@@ -876,13 +876,13 @@ pub mod types {
                     pub sun_path: [c_char, ..104]
                 }
                 pub struct ifaddrs {
-                    pub ifa_next: *ifaddrs,
-                    pub ifa_name: *c_char,
+                    pub ifa_next: *mut ifaddrs,
+                    pub ifa_name: *mut c_char,
                     pub ifa_flags: c_uint,
-                    pub ifa_addr: *sockaddr,
-                    pub ifa_netmask: *sockaddr,
-                    pub ifa_dstaddr: *sockaddr,
-                    pub ifa_data: *c_void
+                    pub ifa_addr: *mut sockaddr,
+                    pub ifa_netmask: *mut sockaddr,
+                    pub ifa_dstaddr: *mut sockaddr,
+                    pub ifa_data: *mut c_void
                 }
 
 
@@ -1446,13 +1446,13 @@ pub mod types {
                     pub sun_path: [c_char, ..104]
                 }
                 pub struct ifaddrs {
-                    pub ifa_next: *ifaddrs,
-                    pub ifa_name: *c_char,
+                    pub ifa_next: *mut ifaddrs,
+                    pub ifa_name: *mut c_char,
                     pub ifa_flags: c_uint,
-                    pub ifa_addr: *sockaddr,
-                    pub ifa_netmask: *sockaddr,
-                    pub ifa_dstaddr: *sockaddr,
-                    pub ifa_data: *c_void
+                    pub ifa_addr: *mut sockaddr,
+                    pub ifa_netmask: *mut sockaddr,
+                    pub ifa_dstaddr: *mut sockaddr,
+                    pub ifa_data: *mut c_void
                 }
             }
         }
@@ -4110,7 +4110,7 @@ pub mod funcs {
             use types::os::arch::c95::{c_char, c_uint};
 
             extern {
-                pub fn if_nametoindex(ifname: *c_char) -> c_uint;
+                pub fn if_nametoindex(ifname: *const c_char) -> c_uint;
             }
         }
 
@@ -4275,7 +4275,7 @@ pub mod funcs {
             pub fn sendto(socket: c_int, buf: *const c_void, len: size_t,
                           flags: c_int, addr: *const sockaddr,
                           addrlen: socklen_t) -> ssize_t;
-            pub fn getifaddrs(ifap: *mut *ifaddrs) -> c_int;
+            pub fn getifaddrs(ifap: *mut *const ifaddrs) -> c_int;
             pub fn freeifaddrs(ifa: *const ifaddrs);
             pub fn shutdown(socket: c_int, how: c_int) -> c_int;
         }
@@ -4610,7 +4610,7 @@ pub mod funcs {
             use types::os::common::bsd44::SOCKET;
 
             extern "system" {
-                pub fn ioctlsocket(s: SOCKET, cmd: c_long, argp: *c_ulong) -> c_int;
+                pub fn ioctlsocket(s: SOCKET, cmd: c_long, argp: *mut c_ulong) -> c_int;
             }
         }
     }

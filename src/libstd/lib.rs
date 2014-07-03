@@ -265,13 +265,11 @@ mod failure;
 #[doc(hidden)]
 mod std {
     // mods used for deriving
-    pub use cast;
     pub use clone;
     pub use cmp;
     pub use hash;
 
     pub use comm; // used for select!()
-    pub use container;
     pub use fmt; // used for any formatting strings
     pub use io; // used for println!()
     pub use iter;
@@ -282,7 +280,6 @@ mod std {
     pub use result;
     pub use rt; // used for fail!()
     pub use vec; // used for vec![]
-    pub use vec_ng;
 
     // The test runner calls ::std::os::args() but really wants realstd
     #[cfg(test)] pub use os = realstd::os;
