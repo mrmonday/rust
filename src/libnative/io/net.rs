@@ -773,7 +773,7 @@ impl Socket {
 
 impl rtio::RtioCustomSocket for Socket {
     fn recvfrom(&mut self, buf: &mut [u8])
-        -> IoResult<(uint, *libc::sockaddr)>
+        -> IoResult<(uint, *const libc::sockaddr)>
     {
         let mut caddr: libc::sockaddr_storage = unsafe { intrinsics::init() };
         let mut caddrlen = unsafe {
@@ -795,12 +795,12 @@ impl rtio::RtioCustomSocket for Socket {
         return Ok((len as uint, unsafe { intrinsics::transmute(&caddr) }));
     }
 
-    fn sendto(&mut self, buf: &[u8], addr: *libc::sockaddr, slen: uint)
+    fn sendto(&mut self, buf: &[u8], addr: *const libc::sockaddr, slen: uint)
         -> IoResult<uint>
     {
         let len = unsafe {
                     retry( || libc::sendto(self.fd,
-                                 buf.as_ptr() as *libc::c_void,
+                                 buf.as_ptr() as *const libc::c_void,
                                  net_buflen(buf),
                                  0,
                                  addr,

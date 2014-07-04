@@ -12,29 +12,32 @@
 
 // FIXME This needs syncing/can probably all be removed
 
-#[crate_id = "netsupport#0.10-pre"];
-#[license = "MIT/ASL2"];
-#[crate_type = "rlib"];
-#[crate_type = "dylib"];
-#[doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+#![crate_id = "netsupport#0.10-pre"]
+#![license = "MIT/ASL2"]
+#![crate_type = "rlib"]
+#![crate_type = "dylib"]
+#![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
       html_favicon_url = "http://www.rust-lang.org/favicon.ico",
-      html_root_url = "http://static.rust-lang.org/doc/master")];
+      html_root_url = "http://static.rust-lang.org/doc/master")]
+#![feature(macro_rules)]
+#![feature(globs)]
 
-use std::cast;
+extern crate libc;
+use std::intrinsics;
 use std::io;
 use std::io::net::ip;
 use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::io::net::raw::{IpAddress, MacAddr, NetworkAddress, NetworkInterface};
-use std::io::net::raw;
-use std::libc;
 use std::mem;
 use std::os;
 use std::result::Result;
-use std::vec_ng::Vec;
 
 #[cfg(not(windows))] use std::iter::Iterator;
 #[cfg(not(windows))] use std::ptr;
 #[cfg(not(windows))] use strraw = std::str::raw;
+
+use raw::{NetworkInterface, NetworkAddress, IpAddress, MacAddr};
+mod raw;
+
 
 pub fn htons(u: u16) -> u16 {
     mem::to_be16(u as i16) as u16
@@ -80,14 +83,14 @@ pub fn addr_to_sockaddr(addr: ip::SocketAddr) -> (libc::sockaddr_storage, uint) 
         let storage: libc::sockaddr_storage = mem::init();
         let len = match ip_to_inaddr(addr.ip) {
             InAddr(inaddr) => {
-                let storage: *mut libc::sockaddr_in = cast::transmute(&storage);
+                let storage: *mut libc::sockaddr_in = intrinsics::transmute(&storage);
                 (*storage).sin_family = libc::AF_INET as libc::sa_family_t;
                 (*storage).sin_port = htons(addr.port);
                 (*storage).sin_addr = inaddr;
                 mem::size_of::<libc::sockaddr_in>()
             }
             In6Addr(inaddr) => {
-                let storage: *mut libc::sockaddr_in6 = cast::transmute(&storage);
+                let storage: *mut libc::sockaddr_in6 = intrinsics::transmute(&storage);
                 (*storage).sin6_family = libc::AF_INET6 as libc::sa_family_t;
                 (*storage).sin6_port = htons(addr.port);
                 (*storage).sin6_addr = inaddr;
@@ -104,7 +107,7 @@ pub fn sockaddr_to_addr(storage: &libc::sockaddr_storage,
         libc::AF_INET => {
             assert!(len as uint >= mem::size_of::<libc::sockaddr_in>());
             let storage: &libc::sockaddr_in = unsafe {
-                cast::transmute(storage)
+                intrinsics::transmute(storage)
             };
             let addr = storage.sin_addr.s_addr as u32;
             let a = (addr >>  0) as u8;
@@ -119,7 +122,7 @@ pub fn sockaddr_to_addr(storage: &libc::sockaddr_storage,
         libc::AF_INET6 => {
             assert!(len as uint >= mem::size_of::<libc::sockaddr_in6>());
             let storage: &libc::sockaddr_in6 = unsafe {
-                cast::transmute(storage)
+                intrinsics::transmute(storage)
             };
             let a = ntohs(storage.sin6_addr.s6_addr[0]);
             let b = ntohs(storage.sin6_addr.s6_addr[1]);
@@ -141,10 +144,10 @@ pub fn sockaddr_to_addr(storage: &libc::sockaddr_storage,
 }
 
 #[cfg(target_os = "linux")]
-pub fn sockaddr_to_network_addr(sa: *libc::sockaddr, useLocal: bool) -> Option<Box<NetworkAddress>> {
+pub fn sockaddr_to_network_addr(sa: *const libc::sockaddr, useLocal: bool) -> Option<Box<NetworkAddress>> {
     unsafe {
         if (*sa).sa_family as libc::c_int == libc::AF_PACKET {
-            let sll: *libc::sockaddr_ll = cast::transmute(sa);
+            let sll: *const libc::sockaddr_ll = intrinsics::transmute(sa);
             let ni = if useLocal {
                 let nis = get_network_interfaces();
                 if nis.iter().filter(|x| x.index as i32 == (*sll).sll_ifindex).len() == 1 {
@@ -162,7 +165,7 @@ pub fn sockaddr_to_network_addr(sa: *libc::sockaddr, useLocal: bool) -> Option<B
 
             return Some(box NetworkAddress(ni));
         } else {
-            return Some(box IpAddress(sockaddr_to_addr(cast::transmute(sa),
+            return Some(box IpAddress(sockaddr_to_addr(intrinsics::transmute(sa),
                                                     mem::size_of::<libc::sockaddr_storage>()
                                                     ).unwrap().ip));
         }
@@ -173,7 +176,7 @@ pub fn sockaddr_to_network_addr(sa: *libc::sockaddr, useLocal: bool) -> Option<B
                           sll.sll_addr[2], sll.sll_addr[3],
                           sll.sll_addr[4], sll.sll_addr[5]);
         box NetworkInterface {
-            name: box ""
+            name: box "",
             index: 0,
             mac: Some(mac),
             ipv4: None,
@@ -184,11 +187,11 @@ pub fn sockaddr_to_network_addr(sa: *libc::sockaddr, useLocal: bool) -> Option<B
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn sockaddr_to_network_addr(sa: *libc::sockaddr, _useLocal: bool) -> Option<Box<NetworkAddress>> {
+pub fn sockaddr_to_network_addr(sa: *const libc::sockaddr, _useLocal: bool) -> Option<Box<NetworkAddress>> {
     unsafe {
         Some(
             box IpAddress(
-                sockaddr_to_addr(cast::transmute(sa),
+                sockaddr_to_addr(intrinsics::transmute(sa),
                      mem::size_of::<libc::sockaddr_storage>()
                 ).unwrap().ip)
         )
@@ -204,7 +207,7 @@ pub fn network_addr_to_sockaddr(na: Box<NetworkAddress>) -> (libc::sockaddr_stor
             //_ => (mem::init(), 0)
             box NetworkAddress(ni) => {
                 let mut storage: libc::sockaddr_storage = mem::init();
-                let sll: &mut libc::sockaddr_ll = cast::transmute(&mut storage);
+                let sll: &mut libc::sockaddr_ll = intrinsics::transmute(&mut storage);
                 sll.sll_family = libc::AF_PACKET as libc::sa_family_t;
                 match ni.mac {
                     Some(MacAddr(a, b, c, d, e, f)) => sll.sll_addr = [a, b, c, d, e, f, 0, 0],
@@ -226,7 +229,7 @@ pub fn network_addr_to_sockaddr(na: Box<NetworkAddress>) -> (libc::sockaddr_stor
      }
 }
 
-pub fn sockaddr_to_network_addrs(sa: *libc::sockaddr)
+pub fn sockaddr_to_network_addrs(sa: *const libc::sockaddr)
     -> (Option<MacAddr>, Option<IpAddr>, Option<IpAddr>) {
     match sockaddr_to_network_addr(sa, false) {
         Some(box IpAddress(ip@Ipv4Addr(..))) => (None, Some(ip), None),
@@ -240,7 +243,7 @@ pub fn sockaddr_to_network_addrs(sa: *libc::sockaddr)
 pub fn get_network_interfaces() -> Vec<Box<NetworkInterface>> {
     let mut ifaces: Vec<Box<NetworkInterface>> = Vec::new();
     unsafe {
-        let mut addrs: *libc::ifaddrs = mem::init();
+        let mut addrs: *mut libc::ifaddrs = mem::init();
         if libc::getifaddrs(&mut addrs) != 0 {
             return ifaces;
         }

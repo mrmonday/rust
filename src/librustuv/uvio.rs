@@ -29,7 +29,7 @@ use file::{FsRequest, FileWatcher};
 use queue::QueuePool;
 use homing::HomeHandle;
 use idle::IdleWatcher;
-use net::{TcpWatcher, TcpListener, UdpWatcher};
+use net::{SocketWatcher, TcpWatcher, TcpListener, UdpWatcher};
 use pipe::{PipeWatcher, PipeListener};
 use process::Process;
 use signal::SignalWatcher;
@@ -176,8 +176,8 @@ impl IoFactory for UvIoFactory {
         r.map_err(uv_error_to_io_error)
     }
 
-    fn socket_from_raw_fd(&mut self, fd: c_int) -> IoResult<Box<rtio::RtioSocket + Send>> {
-        SocketWatcher::new(self, fd).map(|sw| box fd as Box<rtio::RtioSocket + Send>);
+    fn socket_from_raw_fd(&mut self, fd: c_int, close_on_drop: bool) -> IoResult<Box<rtio::RtioSocket + Send>> {
+        SocketWatcher::new(self, fd, close_on_drop).map(|sw| box fd as Box<rtio::RtioSocket + Send>);
     }
 
     fn fs_from_raw_fd(&mut self, fd: c_int, close: rtio::CloseBehavior)

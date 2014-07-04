@@ -10,7 +10,9 @@
 
 use libc::{size_t, ssize_t, c_int, c_void, c_uint};
 use libc;
+use std::intrinsics;
 use std::mem;
+use std::os;
 use std::ptr;
 use std::rt::rtio;
 use std::rt::rtio::IoError;
@@ -808,16 +810,49 @@ impl Drop for UdpWatcher {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct RawSocketWatcher {
-    handle: *uvll::uv_poll_t,
+    handle: *const uvll::uv_poll_t,
     socket: uvll::uv_os_socket_t,
     home: HomeHandle,
+    close_on_drop: bool,
 }
+
+#[cfg(windows)]
+pub fn net_buflen(buf: &[u8]) -> i32 {
+    buf.len() as i32
+}
+
+#[cfg(not(windows))]
+pub fn net_buflen(buf: &[u8]) -> u64 {
+    buf.len() as u64
+}
+
+#[cfg(windows)]
+fn last_error() -> IoError {
+    use std::os;
+    let code = unsafe { c::WSAGetLastError() as uint };
+    IoError {
+        code: code,
+        extra: 0,
+        detail: Some(os::error_string(code)),
+    }
+}
+
+#[cfg(not(windows))]
+fn last_error() -> IoError {
+    let errno = os::errno() as uint;
+    IoError {
+        code: os::errno() as uint,
+        extra: 0,
+        detail: Some(os::error_string(errno)),
+    }
+}
+
 
 #[cfg(windows)]
 fn make_nonblocking(socket: libc::SOCKET) -> Option<IoError> {
     let one: libc::c_ulong = 1;
-    if unsafe { libc::ioctlsocket(socket, libc::FIONBIO, &one as *libc::c_ulong) } != 0 {
-        Some(netsupport::last_error())
+    if unsafe { libc::ioctlsocket(socket, libc::FIONBIO, &one as *const libc::c_ulong) } != 0 {
+        Some(last_error())
     } else {
         None
     }
@@ -827,29 +862,25 @@ fn make_nonblocking(socket: libc::SOCKET) -> Option<IoError> {
 fn make_nonblocking(socket: c_int) -> Option<IoError> {
     let flags = unsafe { libc::fcntl(socket, libc::F_GETFL, 0) };
     if flags == -1 {
-        return Some(netsupport::last_error());
+        return Some(last_error());
     }
     if unsafe { libc::fcntl(socket, libc::F_SETFL, flags | libc::O_NONBLOCK) } == -1 {
-        return Some(netsupport::last_error());
+        return Some(last_error());
     }
     return None;
 }
 
-impl RawSocketWatcher {
-    pub fn new(io: &mut UvIoFactory, protocol: raw::Protocol)
-        -> Result<RawSocketWatcher, IoError>
+impl SocketWatcher {
+    pub fn new(io: &mut UvIoFactory, socket: libc::c_int, close_on_drop: bool)
+        -> Result<SocketWatcher, IoError>
     {
-        let (domain, typ, proto) = netsupport::protocol_to_libc(protocol);
         let handle = unsafe { uvll::malloc_handle(uvll::UV_POLL) };
-        let socket = unsafe { libc::socket(domain, typ, proto) };
-        if socket == -1 {
-            return Err(netsupport::last_error());
-        }
 
         let raw = RawSocketWatcher {
             handle: handle,
             home: io.make_handle(),
-            socket: socket
+            socket: socket,
+            close_on_drop: close_on_drop
         };
 
         // Make socket non-blocking - required for libuv
@@ -865,29 +896,31 @@ impl RawSocketWatcher {
     }
 }
 
-impl UvHandle<uvll::uv_poll_t> for RawSocketWatcher {
-    fn uv_handle(&self) -> *uvll::uv_poll_t { self.handle }
+impl UvHandle<uvll::uv_poll_t> for SocketWatcher {
+    fn uv_handle(&self) -> *const uvll::uv_poll_t { self.handle }
 }
 
-impl Drop for RawSocketWatcher {
+impl Drop for SocketWatcher {
     fn drop(&mut self) {
         let _m = self.fire_homing_missile();
-        self.close();
+        if self.close_on_drop {
+            self.close();
+        }
     }
 }
 
-impl HomingIO for RawSocketWatcher {
+impl HomingIO for SocketWatcher {
     fn home<'r>(&'r mut self) -> &'r mut HomeHandle { &mut self.home }
 }
 
-impl rtio::RtioRawSocket for RawSocketWatcher {
+impl rtio::RtioCustomSocket for SocketWatcher {
     fn recvfrom(&mut self, buf: &mut [u8])
-        -> Result<(uint, Option<~raw::NetworkAddress>), IoError>
+        -> Result<(uint, *const libc::sockaddr), IoError>
     {
         struct Ctx<'b> {
             task: Option<BlockedTask>,
             buf: &'b [u8],
-            result: Option<(ssize_t, Option<~raw::NetworkAddress>)>,
+            result: Option<(ssize_t, *const libc::sockaddr)>,
             socket: Option<uvll::uv_os_socket_t>,
         }
         let _m = self.fire_homing_missile();
@@ -914,10 +947,10 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
         };
         return a;
 
-        extern fn recv_cb(handle: *uvll::uv_poll_t, status: c_int, events: c_int) {
+        extern fn recv_cb(handle: *const uvll::uv_poll_t, status: c_int, events: c_int) {
             assert!((events & (uvll::UV_READABLE as c_int)) != 0);
             let cx: &mut Ctx = unsafe {
-                cast::transmute(uvll::get_data_for_uv_handle(handle))
+                intrinsics::transmute(uvll::get_data_for_uv_handle(handle))
             };
 
             if status < 0 {
@@ -939,7 +972,7 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
                     let addr = &mut caddr as *mut libc::sockaddr_storage;
                     libc::recvfrom(sock,
                                    cx.buf.as_ptr() as *mut c_void,
-                                   netsupport::net_buflen(cx.buf),
+                                   net_buflen(cx.buf),
                                    0,
                                    addr as *mut libc::sockaddr,
                                    &mut caddrlen)
@@ -947,20 +980,18 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
                 _   => -1
             };
             if len == -1 {
-                cx.result = Some((-errno() as ssize_t, None));
+                cx.result = Some((-os::errno() as ssize_t, None));
                 wakeup(&mut cx.task);
                 return;
             }
-            let addr = netsupport::sockaddr_to_network_addr(
-                (&caddr as *libc::sockaddr_storage) as *libc::sockaddr, true
-            );
-            cx.result = Some((len as ssize_t, addr));
+
+            cx.result = Some((len as ssize_t, unsafe { intrinsics::transmute(&caddr) }));
 
             wakeup(&mut cx.task);
         }
     }
 
-    fn sendto(&mut self, buf: &[u8], dst: ~raw::NetworkAddress)
+    fn sendto(&mut self, buf: &[u8], dst: *const libc::sockaddr, slen: uint)
         -> Result<uint, IoError>
     {
         struct Ctx<'b> {
@@ -968,7 +999,8 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
             buf: &'b [u8],
             result: Option<Result<uint, IoError>>,
             socket: Option<uvll::uv_os_socket_t>,
-            addr: ~raw::NetworkAddress,
+            addr: *const libc::sockaddr,
+            len: uint
         }
         let _m = self.fire_homing_missile();
 
@@ -981,7 +1013,8 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
                     buf: buf,
                     result: None,
                     socket: Some(self.socket),
-                    addr: dst
+                    addr: dst,
+                    len: slen
                 };
                 wait_until_woken_after(&mut cx.task, &self.uv_loop(), || {
                     unsafe { uvll::set_data_for_uv_handle(self.handle, &cx) }
@@ -992,10 +1025,10 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
         };
         return a;
 
-        extern fn send_cb(handle: *uvll::uv_poll_t, status: c_int, events: c_int) {
+        extern fn send_cb(handle: *const uvll::uv_poll_t, status: c_int, events: c_int) {
             assert!((events & (uvll::UV_WRITABLE as c_int)) != 0);
             let cx: &mut Ctx = unsafe {
-                cast::transmute(uvll::get_data_for_uv_handle(handle))
+                intrinsics::transmute(uvll::get_data_for_uv_handle(handle))
             };
             if status < 0 {
                 cx.result = Some(Err(uv_error_to_io_error(UvError(status))));
@@ -1009,21 +1042,20 @@ impl rtio::RtioRawSocket for RawSocketWatcher {
 
             let len = match cx.socket {
                 Some(sock) => {
-                    let (addr, len) = netsupport::network_addr_to_sockaddr(cx.addr.clone());
                     unsafe {
                         libc::sendto(sock,
-                            cx.buf.as_ptr() as *c_void,
-                            netsupport::net_buflen(cx.buf),
+                            cx.buf.as_ptr() as *const c_void,
+                            net_buflen(cx.buf),
                             0,
-                            (&addr as *libc::sockaddr_storage) as *libc::sockaddr,
-                            len as libc::socklen_t)
+                            cx.addr,
+                            cx.len as libc::socklen_t)
                     }
                 },
                 _   => -1
             };
 
             cx.result = if len < 0 {
-                            Some(Err(netsupport::last_error()))
+                            Some(Err(last_error()))
                         } else {
                             Some(Ok(len as uint))
                         };
