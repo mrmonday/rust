@@ -278,11 +278,7 @@ pub fn maybe_aborted<T>(result: T, mut p: Parser) -> T {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serialize::{json, Encodable};
-    use std::io;
-    use std::io::MemWriter;
-    use std::mem::transmute;
-    use std::str;
+    use serialize::json;
     use std::gc::GC;
     use codemap::{Span, BytePos, Spanned};
     use owned_slice::OwnedSlice;
@@ -295,16 +291,6 @@ mod test {
     use util::parser_testing::{string_to_tts, string_to_parser};
     use util::parser_testing::{string_to_expr, string_to_item};
     use util::parser_testing::string_to_stmt;
-
-    fn to_json_str<'a, E: Encodable<json::Encoder<'a>, io::IoError>>(val: &E) -> String {
-        let mut writer = MemWriter::new();
-        // FIXME(14302) remove the transmute and unsafe block.
-        unsafe {
-            let mut encoder = json::Encoder::new(&mut writer as &mut io::Writer);
-            let _ = val.encode(transmute(&mut encoder));
-        }
-        str::from_utf8(writer.unwrap().as_slice()).unwrap().to_string()
-    }
 
     // produce a codemap::span
     fn sp(a: u32, b: u32) -> Span {
@@ -415,7 +401,7 @@ mod test {
 
     #[test] fn string_to_tts_1 () {
         let tts = string_to_tts("fn a (b : int) { b; }".to_string());
-        assert_eq!(to_json_str(&tts),
+        assert_eq!(json::encode(&tts),
         "[\
     {\
         \"variant\":\"TTTok\",\
@@ -594,23 +580,15 @@ mod test {
     #[test] fn parse_ident_pat () {
         let sess = new_parse_sess();
         let mut parser = string_to_parser(&sess, "b".to_string());
-        assert!(parser.parse_pat() ==
-                   box(GC) ast::Pat{id: ast::DUMMY_NODE_ID,
-                             node: ast::PatIdent(
-                                ast::BindByValue(ast::MutImmutable),
-                                ast::Path {
-                                    span:sp(0,1),
-                                    global:false,
-                                    segments: vec!(
-                                        ast::PathSegment {
-                                            identifier: str_to_ident("b"),
-                                            lifetimes: Vec::new(),
-                                            types: OwnedSlice::empty(),
-                                        }
-                                    ),
-                                },
-                                None /* no idea */),
-                             span: sp(0,1)});
+        assert!(parser.parse_pat()
+                == box(GC) ast::Pat{
+                id: ast::DUMMY_NODE_ID,
+                node: ast::PatIdent(ast::BindByValue(ast::MutImmutable),
+                                    Spanned{ span:sp(0, 1),
+                                             node: str_to_ident("b")
+                    },
+                                    None),
+                span: sp(0,1)});
         parser_done(parser);
     }
 
@@ -643,24 +621,15 @@ mod test {
                                         id: ast::DUMMY_NODE_ID,
                                         node: ast::PatIdent(
                                             ast::BindByValue(ast::MutImmutable),
-                                            ast::Path {
-                                                span:sp(6,7),
-                                                global:false,
-                                                segments: vec!(
-                                                    ast::PathSegment {
-                                                        identifier:
-                                                            str_to_ident("b"),
-                                                        lifetimes: Vec::new(),
-                                                        types: OwnedSlice::empty(),
-                                                    }
-                                                ),
-                                            },
-                                            None // no idea
-                                        ),
-                                        span: sp(6,7)
-                                    },
-                                    id: ast::DUMMY_NODE_ID
-                                }),
+                                                Spanned{
+                                                    span: sp(6,7),
+                                                    node: str_to_ident("b")},
+                                                None
+                                                    ),
+                                            span: sp(6,7)
+                                        },
+                                        id: ast::DUMMY_NODE_ID
+                                    }),
                                 output: ast::P(ast::Ty{id: ast::DUMMY_NODE_ID,
                                                        node: ast::TyNil,
                                                        span:sp(15,15)}), // not sure

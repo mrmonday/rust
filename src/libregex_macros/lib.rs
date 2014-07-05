@@ -11,13 +11,13 @@
 //! This crate provides the `regex!` macro. Its use is documented in the
 //! `regex` crate.
 
-#![crate_id = "regex_macros#0.11.0-pre"]
+#![crate_id = "regex_macros#0.11.0"]
 #![crate_type = "dylib"]
 #![experimental]
 #![license = "MIT/ASL2"]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/")]
+       html_root_url = "http://doc.rust-lang.org/0.11.0/")]
 
 #![feature(plugin_registrar, managed_boxes, quote)]
 
@@ -32,7 +32,6 @@ use syntax::ast;
 use syntax::codemap;
 use syntax::ext::build::AstBuilder;
 use syntax::ext::base::{ExtCtxt, MacResult, MacExpr, DummyResult};
-use syntax::parse;
 use syntax::parse::token;
 use syntax::print::pprust;
 
@@ -317,7 +316,7 @@ fn exec<'t>(which: ::regex::native::MatchKind, input: &'t str,
 
         #[inline]
         fn groups<'r>(&'r mut self, i: uint) -> &'r mut Captures {
-            &'r mut self.queue[i].groups
+            &mut self.queue[i].groups
         }
     }
 }
@@ -615,8 +614,7 @@ fn exec<'t>(which: ::regex::native::MatchKind, input: &'t str,
 /// Looks for a single string literal and returns it.
 /// Otherwise, logs an error with cx.span_err and returns None.
 fn parse(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> Option<String> {
-    let mut parser = parse::new_parser_from_tts(cx.parse_sess(), cx.cfg(),
-                                                Vec::from_slice(tts));
+    let mut parser = cx.new_parser_from_tts(tts);
     let entry = cx.expand_expr(parser.parse_expr());
     let regex = match entry.node {
         ast::ExprLit(lit) => {

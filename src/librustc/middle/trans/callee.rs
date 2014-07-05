@@ -216,10 +216,8 @@ fn resolve_default_method_vtables(bcx: &Block,
         bcx.tcx(), &param_substs, &impl_res);
 
     // Now we pull any vtables for parameters on the actual method.
-    param_vtables
-        .get_mut_vec(subst::FnSpace)
-        .push_all(
-            impl_vtables.get_vec(subst::FnSpace).as_slice());
+    param_vtables.push_all(subst::FnSpace,
+                           impl_vtables.get_slice(subst::FnSpace));
 
     param_vtables
 }
@@ -261,7 +259,7 @@ pub fn trans_unboxing_shim(bcx: &Block,
     let function_type =
         ty::mk_bare_fn(tcx, method.fty.clone()).subst(tcx, &substs);
 
-    let function_name = tcx.map.with_path(method_id.node, |path| {
+    let function_name = ty::with_path(tcx, method_id, |path| {
         link::mangle_internal_name_by_path_and_seq(path, "unboxing_shim")
     });
     let llfn = decl_internal_rust_fn(ccx,

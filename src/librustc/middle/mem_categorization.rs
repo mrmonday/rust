@@ -126,7 +126,6 @@ pub enum FieldName {
 #[deriving(Clone, PartialEq, Eq, Hash)]
 pub enum ElementKind {
     VecElement,
-    StrElement,
     OtherElement,
 }
 
@@ -384,7 +383,7 @@ impl<'t,TYPER:Typer> MemCategorizationContext<'t,TYPER> {
             Some(adjustment) => {
                 match *adjustment {
                     ty::AutoObject(..) => {
-                        // Implicity cast a concrete object to trait object.
+                        // Implicitly cast a concrete object to trait object.
                         // Result is an rvalue.
                         let expr_ty = if_ok!(self.expr_ty_adjusted(expr));
                         Ok(self.cat_rvalue_node(expr.id(), expr.span(), expr_ty))
@@ -794,7 +793,7 @@ impl<'t,TYPER:Typer> MemCategorizationContext<'t,TYPER> {
         //! - `derefs`: the deref number to be used for
         //!   the implicit index deref, if any (see above)
 
-        let element_ty = match ty::index(base_cmt.ty) {
+        let element_ty = match ty::array_element_ty(base_cmt.ty) {
           Some(ref mt) => mt.ty,
           None => {
             self.tcx().sess.span_bug(
@@ -1137,9 +1136,6 @@ impl<'t,TYPER:Typer> MemCategorizationContext<'t,TYPER> {
           cat_interior(_, InteriorElement(VecElement)) => {
               "vec content".to_string()
           }
-          cat_interior(_, InteriorElement(StrElement)) => {
-              "str content".to_string()
-          }
           cat_interior(_, InteriorElement(OtherElement)) => {
               "indexed content".to_string()
           }
@@ -1320,7 +1316,6 @@ fn element_kind(t: ty::t) -> ElementKind {
         ty::ty_rptr(_, ty::mt{ty:ty, ..}) |
         ty::ty_uniq(ty) => match ty::get(ty).sty {
             ty::ty_vec(_, None) => VecElement,
-            ty::ty_str => StrElement,
             _ => OtherElement
         },
         ty::ty_vec(..) => VecElement,

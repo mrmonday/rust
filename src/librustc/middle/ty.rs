@@ -981,7 +981,7 @@ impl Generics {
     }
 
     pub fn has_type_params(&self, space: subst::ParamSpace) -> bool {
-        !self.types.get_vec(space).is_empty()
+        !self.types.is_empty_in(space)
     }
 }
 
@@ -1533,11 +1533,23 @@ pub fn type_is_self(ty: t) -> bool {
     }
 }
 
-fn type_is_slice(ty:t) -> bool {
+fn type_is_slice(ty: t) -> bool {
     match get(ty).sty {
         ty_rptr(_, mt) => match get(mt.ty).sty {
             ty_vec(_, None) | ty_str => true,
             _ => false,
+        },
+        _ => false
+    }
+}
+
+pub fn type_is_vec(ty: t) -> bool {
+    match get(ty).sty {
+        ty_vec(..) => true,
+        ty_ptr(mt{ty: t, ..}) | ty_rptr(_, mt{ty: t, ..}) |
+        ty_box(t) | ty_uniq(t) => match get(t).sty {
+            ty_vec(_, None) => true,
+            _ => false
         },
         _ => false
     }
@@ -1560,7 +1572,7 @@ pub fn type_is_simd(cx: &ctxt, ty: t) -> bool {
 
 pub fn sequence_element_type(cx: &ctxt, ty: t) -> t {
     match get(ty).sty {
-        ty_vec(mt, Some(_)) => mt.ty,
+        ty_vec(mt, _) => mt.ty,
         ty_ptr(mt{ty: t, ..}) | ty_rptr(_, mt{ty: t, ..}) |
         ty_box(t) | ty_uniq(t) => match get(t).sty {
             ty_vec(mt, None) => mt.ty,
@@ -2556,6 +2568,21 @@ pub fn index(t: t) -> Option<mt> {
         ty_ptr(mt{ty: t, ..}) | ty_rptr(_, mt{ty: t, ..}) |
         ty_box(t) | ty_uniq(t) => match get(t).sty {
             ty_vec(mt, None) => Some(mt),
+            _ => None,
+        },
+        _ => None
+    }
+}
+
+// Returns the type of elements contained within an 'array-like' type.
+// This is exactly the same as the above, except it supports strings,
+// which can't actually be indexed.
+pub fn array_element_ty(t: t) -> Option<mt> {
+    match get(t).sty {
+        ty_vec(mt, Some(_)) => Some(mt),
+        ty_ptr(mt{ty: t, ..}) | ty_rptr(_, mt{ty: t, ..}) |
+        ty_box(t) | ty_uniq(t) => match get(t).sty {
+            ty_vec(mt, None) => Some(mt),
             ty_str => Some(mt {ty: mk_u8(), mutbl: ast::MutImmutable}),
             _ => None,
         },
@@ -2744,8 +2771,8 @@ pub fn local_var_name_str(cx: &ctxt, id: NodeId) -> InternedString {
     match cx.map.find(id) {
         Some(ast_map::NodeLocal(pat)) => {
             match pat.node {
-                ast::PatIdent(_, ref path, _) => {
-                    token::get_ident(ast_util::path_to_ident(path))
+                ast::PatIdent(_, ref path1, _) => {
+                    token::get_ident(path1.node)
                 }
                 _ => {
                     cx.sess.bug(
@@ -4617,14 +4644,14 @@ pub fn construct_parameter_environment(
     let mut types = VecPerParamSpace::empty();
     for &space in subst::ParamSpace::all().iter() {
         push_types_from_defs(tcx, &mut types, space,
-                             generics.types.get_vec(space));
+                             generics.types.get_slice(space));
     }
 
     // map bound 'a => free 'a
     let mut regions = VecPerParamSpace::empty();
     for &space in subst::ParamSpace::all().iter() {
         push_region_params(&mut regions, space, free_id,
-                           generics.regions.get_vec(space));
+                           generics.regions.get_slice(space));
     }
 
     let free_substs = Substs {
@@ -4639,7 +4666,7 @@ pub fn construct_parameter_environment(
     let mut bounds = VecPerParamSpace::empty();
     for &space in subst::ParamSpace::all().iter() {
         push_bounds_from_defs(tcx, &mut bounds, space, &free_substs,
-                              generics.types.get_vec(space));
+                              generics.types.get_slice(space));
     }
 
     debug!("construct_parameter_environment: free_id={} \
@@ -4657,7 +4684,7 @@ pub fn construct_parameter_environment(
     fn push_region_params(regions: &mut VecPerParamSpace<ty::Region>,
                           space: subst::ParamSpace,
                           free_id: ast::NodeId,
-                          region_params: &Vec<RegionParameterDef>)
+                          region_params: &[RegionParameterDef])
     {
         for r in region_params.iter() {
             regions.push(space, ty::free_region_from_def(free_id, r));
@@ -4667,7 +4694,7 @@ pub fn construct_parameter_environment(
     fn push_types_from_defs(tcx: &ty::ctxt,
                             types: &mut subst::VecPerParamSpace<ty::t>,
                             space: subst::ParamSpace,
-                            defs: &Vec<TypeParameterDef>) {
+                            defs: &[TypeParameterDef]) {
         for (i, def) in defs.iter().enumerate() {
             let ty = ty::mk_param(tcx, space, i, def.def_id);
             types.push(space, ty);
@@ -4678,7 +4705,7 @@ pub fn construct_parameter_environment(
                              bounds: &mut subst::VecPerParamSpace<ParamBounds>,
                              space: subst::ParamSpace,
                              free_substs: &subst::Substs,
-                             defs: &Vec<TypeParameterDef>) {
+                             defs: &[TypeParameterDef]) {
         for def in defs.iter() {
             let b = (*def.bounds).subst(tcx, free_substs);
             bounds.push(space, b);

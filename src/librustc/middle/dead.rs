@@ -247,6 +247,10 @@ impl<'a> Visitor<MarkSymbolVisitorContext> for MarkSymbolVisitor<'a> {
             ast::PatStruct(_, ref fields, _) => {
                 self.handle_field_pattern_match(pat, fields.as_slice());
             }
+            ast::PatIdent(_, _, _) => {
+                // it might be the only use of a static:
+                self.lookup_and_handle_definition(&pat.id)
+            }
             _ => ()
         }
 
@@ -399,7 +403,7 @@ struct DeadVisitor<'a> {
 impl<'a> DeadVisitor<'a> {
     fn should_warn_about_field(&mut self, node: &ast::StructField_) -> bool {
         let (is_named, has_leading_underscore) = match node.ident() {
-            Some(ref ident) => (true, token::get_ident(*ident).get()[0] == ('_' as u8)),
+            Some(ref ident) => (true, token::get_ident(*ident).get().as_bytes()[0] == ('_' as u8)),
             _ => (false, false)
         };
         let field_type = ty::node_id_to_type(self.tcx, node.id);

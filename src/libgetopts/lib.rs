@@ -76,14 +76,14 @@
 //! }
 //! ~~~
 
-#![crate_id = "getopts#0.11.0-pre"]
+#![crate_id = "getopts#0.11.0"]
 #![experimental]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
 #![license = "MIT/ASL2"]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/",
+       html_root_url = "http://doc.rust-lang.org/0.11.0/",
        html_playground_url = "http://play.rust-lang.org/")]
 #![feature(globs, phase)]
 #![deny(missing_doc)]
@@ -370,7 +370,7 @@ impl Matches {
 }
 
 fn is_arg(arg: &str) -> bool {
-    arg.len() > 1 && arg[0] == '-' as u8
+    arg.len() > 1 && arg.as_bytes()[0] == '-' as u8
 }
 
 fn find_opt(opts: &[Opt], nm: Name) -> Option<uint> {
@@ -553,7 +553,7 @@ pub fn getopts(args: &[String], optgrps: &[OptGroup]) -> Result {
         } else {
             let mut names;
             let mut i_arg = None;
-            if cur.as_slice()[1] == '-' as u8 {
+            if cur.as_bytes()[1] == '-' as u8 {
                 let tail = cur.as_slice().slice(2, curlen);
                 let tail_eq: Vec<&str> = tail.split('=').collect();
                 if tail_eq.len() <= 1 {

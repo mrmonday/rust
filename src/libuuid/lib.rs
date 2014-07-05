@@ -54,14 +54,14 @@ Examples of string representations:
 
 */
 
-#![crate_id = "uuid#0.11.0-pre"]
+#![crate_id = "uuid#0.11.0"]
 #![experimental]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
 #![license = "MIT/ASL2"]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/",
+       html_root_url = "http://doc.rust-lang.org/0.11.0/",
        html_playground_url = "http://play.rust-lang.org/")]
 
 #![feature(default_type_params)]
@@ -324,8 +324,8 @@ impl Uuid {
         let mut s: Vec<u8> = Vec::from_elem(32, 0u8);
         for i in range(0u, 16u) {
             let digit = format!("{:02x}", self.bytes[i] as uint);
-            *s.get_mut(i*2+0) = digit.as_slice()[0];
-            *s.get_mut(i*2+1) = digit.as_slice()[1];
+            *s.get_mut(i*2+0) = digit.as_bytes()[0];
+            *s.get_mut(i*2+1) = digit.as_bytes()[1];
         }
         str::from_utf8(s.as_slice()).unwrap().to_string()
     }

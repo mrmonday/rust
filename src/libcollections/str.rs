@@ -97,6 +97,15 @@ Section: Creating a string
 ///
 /// Returns `Err` with the original vector if the vector contains invalid
 /// UTF-8.
+///
+/// # Example
+///
+/// ```rust
+/// use std::str;
+/// let hello_vec = vec![104, 101, 108, 108, 111];
+/// let string = str::from_utf8_owned(hello_vec);
+/// assert_eq!(string, Ok("hello".to_string()));
+/// ```
 pub fn from_utf8_owned(vv: Vec<u8>) -> Result<String, Vec<u8>> {
     String::from_utf8(vv)
 }
@@ -111,8 +120,8 @@ pub fn from_utf8_owned(vv: Vec<u8>) -> Result<String, Vec<u8>> {
 ///
 /// ```rust
 /// use std::str;
-/// let string = str::from_byte(66u8);
-/// assert_eq!(string.as_slice(), "B");
+/// let string = str::from_byte(104);
+/// assert_eq!(string.as_slice(), "h");
 /// ```
 pub fn from_byte(b: u8) -> String {
     assert!(b < 128u8);
@@ -120,6 +129,14 @@ pub fn from_byte(b: u8) -> String {
 }
 
 /// Convert a char to a string
+///
+/// # Example
+///
+/// ```rust
+/// use std::str;
+/// let string = str::from_char('b');
+/// assert_eq!(string.as_slice(), "b");
+/// ```
 pub fn from_char(ch: char) -> String {
     let mut buf = String::new();
     buf.push_char(ch);
@@ -127,6 +144,15 @@ pub fn from_char(ch: char) -> String {
 }
 
 /// Convert a vector of chars to a string
+///
+/// # Example
+///
+/// ```rust
+/// use std::str;
+/// let chars = ['h', 'e', 'l', 'l', 'o'];
+/// let string = str::from_chars(chars);
+/// assert_eq!(string.as_slice(), "hello");
+/// ```
 pub fn from_chars(chs: &[char]) -> String {
     chs.iter().map(|c| *c).collect()
 }
@@ -134,9 +160,27 @@ pub fn from_chars(chs: &[char]) -> String {
 /// Methods for vectors of strings
 pub trait StrVector {
     /// Concatenate a vector of strings.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let first = "Restaurant at the End of the".to_string();
+    /// let second = " Universe".to_string();
+    /// let string_vec = vec![first, second];
+    /// assert_eq!(string_vec.concat(), "Restaurant at the End of the Universe".to_string());
+    /// ```
     fn concat(&self) -> String;
 
     /// Concatenate a vector of strings, placing a given separator between each.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let first = "Roast".to_string();
+    /// let second = "Sirloin Steak".to_string();
+    /// let string_vec = vec![first, second];
+    /// assert_eq!(string_vec.connect(", "), "Roast, Sirloin Steak".to_string());
+    /// ```
     fn connect(&self, sep: &str) -> String;
 }
 
@@ -146,7 +190,7 @@ impl<'a, S: Str> StrVector for &'a [S] {
             return String::new();
         }
 
-        // `len` calculation may overflow but push_str but will check boundaries
+        // `len` calculation may overflow but push_str will check boundaries
         let len = self.iter().map(|s| s.as_slice().len()).sum();
 
         let mut result = String::with_capacity(len);
@@ -1543,8 +1587,8 @@ mod tests {
         let n2: uint = v.len();
         assert_eq!(n1, n2);
         while i < n1 {
-            let a: u8 = s1.as_slice()[i];
-            let b: u8 = s2.as_slice()[i];
+            let a: u8 = s1.as_bytes()[i];
+            let b: u8 = s2.as_bytes()[i];
             debug!("{}", a);
             debug!("{}", b);
             assert_eq!(a, b);
