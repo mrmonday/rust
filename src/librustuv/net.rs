@@ -809,8 +809,8 @@ impl Drop for UdpWatcher {
 /// Raw socket implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-pub struct RawSocketWatcher {
-    handle: *const uvll::uv_poll_t,
+pub struct SocketWatcher {
+    handle: *mut uvll::uv_poll_t,
     socket: uvll::uv_os_socket_t,
     home: HomeHandle,
     close_on_drop: bool,
@@ -860,7 +860,7 @@ fn make_nonblocking(socket: libc::SOCKET) -> Option<IoError> {
 
 #[cfg(not(windows))]
 fn make_nonblocking(socket: c_int) -> Option<IoError> {
-    let flags = unsafe { libc::fcntl(socket, libc::F_GETFL, 0) };
+    let flags = unsafe { libc::fcntl(socket, libc::F_GETFL, 0i) };
     if flags == -1 {
         return Some(last_error());
     }
@@ -876,7 +876,7 @@ impl SocketWatcher {
     {
         let handle = unsafe { uvll::malloc_handle(uvll::UV_POLL) };
 
-        let raw = RawSocketWatcher {
+        let raw = SocketWatcher {
             handle: handle,
             home: io.make_handle(),
             socket: socket,
@@ -897,7 +897,7 @@ impl SocketWatcher {
 }
 
 impl UvHandle<uvll::uv_poll_t> for SocketWatcher {
-    fn uv_handle(&self) -> *const uvll::uv_poll_t { self.handle }
+    fn uv_handle(&self) -> *mut uvll::uv_poll_t { self.handle }
 }
 
 impl Drop for SocketWatcher {
@@ -920,7 +920,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
         struct Ctx<'b> {
             task: Option<BlockedTask>,
             buf: &'b [u8],
-            result: Option<(ssize_t, *const libc::sockaddr)>,
+            result: Option<(ssize_t, Option<*const libc::sockaddr>)>,
             socket: Option<uvll::uv_os_socket_t>,
         }
         let _m = self.fire_homing_missile();
@@ -935,19 +935,19 @@ impl rtio::RtioCustomSocket for SocketWatcher {
                     socket: Some(self.socket),
                 };
                 wait_until_woken_after(&mut cx.task, &self.uv_loop(), || {
-                    unsafe { uvll::set_data_for_uv_handle(self.handle, &cx) }
+                    unsafe { uvll::set_data_for_uv_handle(self.handle, &mut cx) }
                 });
                 match cx.result.take_unwrap() {
                     (n, _) if n < 0 =>
-                        Err(netsupport::translate_error(n as i32, true)),
-                    (n, addr) => Ok((n as uint, Some(addr.unwrap())))
+                        Err(IoError { code: n as uint, extra: 0, detail: Some(os::error_string(n as uint)) }),
+                    (n, addr) => Ok((n as uint, addr.unwrap()))
                 }
             }
             n => Err(uv_error_to_io_error(UvError(n)))
         };
         return a;
 
-        extern fn recv_cb(handle: *const uvll::uv_poll_t, status: c_int, events: c_int) {
+        extern fn recv_cb(handle: *mut uvll::uv_poll_t, status: c_int, events: c_int) {
             assert!((events & (uvll::UV_READABLE as c_int)) != 0);
             let cx: &mut Ctx = unsafe {
                 intrinsics::transmute(uvll::get_data_for_uv_handle(handle))
@@ -985,7 +985,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
                 return;
             }
 
-            cx.result = Some((len as ssize_t, unsafe { intrinsics::transmute(&caddr) }));
+            cx.result = Some((len as ssize_t, Some(unsafe { intrinsics::transmute(&caddr) })));
 
             wakeup(&mut cx.task);
         }
@@ -1017,7 +1017,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
                     len: slen
                 };
                 wait_until_woken_after(&mut cx.task, &self.uv_loop(), || {
-                    unsafe { uvll::set_data_for_uv_handle(self.handle, &cx) }
+                    unsafe { uvll::set_data_for_uv_handle(self.handle, &mut cx) }
                 });
                 cx.result.unwrap()
             }
@@ -1025,7 +1025,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
         };
         return a;
 
-        extern fn send_cb(handle: *const uvll::uv_poll_t, status: c_int, events: c_int) {
+        extern fn send_cb(handle: *mut uvll::uv_poll_t, status: c_int, events: c_int) {
             assert!((events & (uvll::UV_WRITABLE as c_int)) != 0);
             let cx: &mut Ctx = unsafe {
                 intrinsics::transmute(uvll::get_data_for_uv_handle(handle))

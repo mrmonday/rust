@@ -120,7 +120,7 @@ pub use consts::os::bsd44::{SO_REUSEADDR, SO_BROADCAST, SHUT_WR, IP_MULTICAST_LO
 pub use consts::os::bsd44::{IP_ADD_MEMBERSHIP, IP_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IPV6_ADD_MEMBERSHIP, IPV6_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IP_MULTICAST_TTL, IP_TTL, SHUT_RD};
-pub use consts::os::extra::{IPPROTO_RAW, AF_PACKET};
+pub use consts::os::extra::{IPPROTO_RAW, AF_PACKET, O_NONBLOCK};
 
 pub use funcs::c95::ctype::{isalnum, isalpha, iscntrl, isdigit};
 pub use funcs::c95::ctype::{islower, isprint, ispunct, isspace};
@@ -177,7 +177,7 @@ pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
 #[cfg(unix)] pub use consts::os::posix88::{ECANCELED, SIGINT, EINPROGRESS};
 #[cfg(unix)] pub use consts::os::posix88::{ENOSYS, ENOTTY, ETIMEDOUT, EMFILE};
 #[cfg(unix)] pub use consts::os::posix88::{SIGTERM, SIGKILL, SIGPIPE, PROT_NONE};
-#[cfg(unix)] pub use consts::os::posix01::{SIG_IGN};
+#[cfg(unix)] pub use consts::os::posix01::{SIG_IGN, F_GETFL, F_SETFL};
 #[cfg(unix)] pub use consts::os::bsd44::{AF_UNIX};
 
 #[cfg(unix)] pub use types::os::common::posix01::{pthread_t, timespec, timezone};
