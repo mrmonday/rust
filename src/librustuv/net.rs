@@ -914,7 +914,7 @@ impl HomingIO for SocketWatcher {
 }
 
 impl rtio::RtioCustomSocket for SocketWatcher {
-    fn recvfrom(&mut self, buf: &mut [u8])
+    fn recv_from(&mut self, buf: &mut [u8])
         -> Result<(uint, *const libc::sockaddr), IoError>
     {
         struct Ctx<'b> {
@@ -991,7 +991,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
         }
     }
 
-    fn sendto(&mut self, buf: &[u8], dst: *const libc::sockaddr, slen: uint)
+    fn send_to(&mut self, buf: &[u8], dst: *const libc::sockaddr, slen: uint)
         -> Result<uint, IoError>
     {
         struct Ctx<'b> {

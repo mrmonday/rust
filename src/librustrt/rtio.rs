@@ -293,8 +293,8 @@ pub trait RtioUdpSocket : RtioSocket {
 }
 
 pub trait RtioCustomSocket {
-    fn recvfrom(&mut self, buf: &mut [u8]) -> IoResult<(uint, *const libc::sockaddr)>;
-    fn sendto(&mut self, buf: &[u8], dst: *const libc::sockaddr, len: uint) -> IoResult<uint>;
+    fn recv_from(&mut self, buf: &mut [u8]) -> IoResult<(uint, *const libc::sockaddr)>;
+    fn send_to(&mut self, buf: &[u8], dst: *const libc::sockaddr, len: uint) -> IoResult<uint>;
 }
 
 pub trait RtioTimer {

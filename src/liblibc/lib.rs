@@ -4284,8 +4284,8 @@ pub mod funcs {
             pub fn sendto(socket: c_int, buf: *const c_void, len: size_t,
                           flags: c_int, addr: *const sockaddr,
                           addrlen: socklen_t) -> ssize_t;
-            pub fn getifaddrs(ifap: *mut *const ifaddrs) -> c_int;
-            pub fn freeifaddrs(ifa: *const ifaddrs);
+            pub fn getifaddrs(ifap: *mut *mut ifaddrs) -> c_int;
+            pub fn freeifaddrs(ifa: *mut ifaddrs);
             pub fn shutdown(socket: c_int, how: c_int) -> c_int;
         }
     }

@@ -408,7 +408,8 @@ impl IoError {
         IoError::from_errno(os::errno() as uint, true)
     }
 
-    fn from_rtio_error(err: rtio::IoError) -> IoError {
+    pub fn from_rtio_error(err: rtio::IoError) -> IoError {
+        #![allow(missing_doc)]
         let rtio::IoError { code, extra, detail } = err;
         let mut ioerr = IoError::from_errno(code, false);
         ioerr.detail = detail;
