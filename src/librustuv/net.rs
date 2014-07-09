@@ -883,18 +883,15 @@ impl SocketWatcher {
             close_on_drop: close_on_drop
         };
 
-        unsafe { let _ = libc::puts("[rustuv] making nonblocking\n".to_c_str().as_ptr()); }
         // Make socket non-blocking - required for libuv
         match make_nonblocking(raw.socket) {
             Some(e) => return Err(e),
             None => ()
         }
-        unsafe { let _ = libc::puts("[rustuv] made nonblocking\n".to_c_str().as_ptr()); }
 
         assert_eq!(unsafe {
             uvll::uv_poll_init_socket(io.uv_loop(), raw.handle, raw.socket)
         }, 0);
-        unsafe { let _ = libc::puts("[rustuv] sock initialised\n".to_c_str().as_ptr()); }
         return Ok(raw);
     }
 }
