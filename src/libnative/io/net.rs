@@ -772,15 +772,13 @@ impl Socket {
 }
 
 impl rtio::RtioCustomSocket for Socket {
-    fn recv_from(&mut self, buf: &mut [u8])
-        -> IoResult<(uint, *const libc::sockaddr)>
+    fn recv_from(&mut self, buf: &mut [u8], addr: *mut libc::sockaddr_storage)
+        -> IoResult<uint>
     {
-        let mut caddr: libc::sockaddr_storage = unsafe { intrinsics::init() };
         let mut caddrlen = unsafe {
                                 intrinsics::size_of::<libc::sockaddr_storage>()
                            } as libc::socklen_t;
         let len = unsafe {
-                    let addr = &mut caddr as *mut libc::sockaddr_storage;
                     retry( || libc::recvfrom(self.fd,
                                    buf.as_ptr() as *mut libc::c_void,
                                    net_buflen(buf),
@@ -792,7 +790,7 @@ impl rtio::RtioCustomSocket for Socket {
             return Err(last_error());
         }
 
-        return Ok((len as uint, unsafe { intrinsics::transmute(&caddr) }));
+        return Ok(len as uint);
     }
 
     fn send_to(&mut self, buf: &[u8], addr: *const libc::sockaddr, slen: uint)

@@ -124,7 +124,6 @@
 #[cfg(test)] extern crate green;
 #[cfg(test)] extern crate debug;
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
-#[cfg(test)] extern crate netsupport;
 
 extern crate alloc;
 extern crate core;
@@ -277,12 +276,8 @@ mod std {
     pub use comm; // used for select!()
     pub use fmt; // used for any formatting strings
     pub use io; // used for println!()
-    pub use iter;
     pub use local_data; // used for local_data_key!()
-    pub use num;
     pub use option; // used for bitflags!()
-    pub use prelude;
-    pub use result;
     pub use rt; // used for fail!()
     pub use vec; // used for vec![]
 
