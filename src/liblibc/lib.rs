@@ -105,7 +105,6 @@ pub use types::os::arch::c99::{c_longlong, c_ulonglong};
 pub use types::os::arch::c99::{intptr_t, uintptr_t};
 pub use types::os::arch::posix88::{dev_t, ino_t, mode_t};
 pub use types::os::arch::posix88::{off_t, pid_t, ssize_t};
-pub use types::os::arch::extra::{sockaddr_ll};
 
 pub use consts::os::c95::{_IOFBF, _IOLBF, _IONBF, BUFSIZ, EOF};
 pub use consts::os::c95::{EXIT_FAILURE, EXIT_SUCCESS};
@@ -126,7 +125,7 @@ pub use consts::os::bsd44::{SO_REUSEADDR, SO_BROADCAST, SHUT_WR, IP_MULTICAST_LO
 pub use consts::os::bsd44::{IP_ADD_MEMBERSHIP, IP_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IPV6_ADD_MEMBERSHIP, IPV6_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IP_MULTICAST_TTL, IP_TTL, SHUT_RD};
-pub use consts::os::extra::{IPPROTO_RAW, AF_PACKET, O_NONBLOCK};
+pub use consts::os::extra::{IPPROTO_RAW, O_NONBLOCK};
 
 pub use funcs::c95::ctype::{isalnum, isalpha, iscntrl, isdigit};
 pub use funcs::c95::ctype::{islower, isprint, ispunct, isspace};
@@ -279,6 +278,10 @@ pub use consts::os::posix01::{CLOCK_REALTIME, CLOCK_MONOTONIC};
 
 #[cfg(target_os = "linux")] #[cfg(target_os = "android")]
 pub use funcs::posix01::unistd::{fdatasync};
+#[cfg(target_os = "linux")] #[cfg(target_os = "android")]
+pub use types::os::arch::extra::{sockaddr_ll};
+#[cfg(target_os = "linux")] #[cfg(target_os = "android")]
+pub use types::os::arch::extra::{AF_PACKET};
 
 #[cfg(unix, not(target_os = "freebsd"))]
 pub use consts::os::extra::{MAP_STACK};
@@ -3120,7 +3123,6 @@ pub mod consts {
             pub static IP_MULTICAST_TTL: c_int = 10;
             pub static IP_MULTICAST_LOOP: c_int = 11;
             pub static IP_TTL: c_int = 4;
-            pub static IP_TTL: c_int = 2;
             pub static IP_ADD_MEMBERSHIP: c_int = 12;
             pub static IP_DROP_MEMBERSHIP: c_int = 13;
             pub static IPV6_ADD_MEMBERSHIP: c_int = 12;
