@@ -3671,15 +3671,15 @@ An example of an object type:
 
 ~~~~
 trait Printable {
-  fn to_string(&self) -> String;
+  fn stringify(&self) -> String;
 }
 
 impl Printable for int {
-  fn to_string(&self) -> String { self.to_str() }
+  fn stringify(&self) -> String { self.to_string() }
 }
 
 fn print(a: Box<Printable>) {
-   println!("{}", a.to_string());
+   println!("{}", a.stringify());
 }
 
 fn main() {
@@ -3889,12 +3889,11 @@ by the prefix operator `box`. When the standard library is in use, the type of a
 An example of an owned box type and value:
 
 ~~~~
-
 let x: Box<int> = box 10;
 ~~~~
 
-Owned box values exist in 1:1 correspondence with their heap allocation
-copying an owned box value makes a shallow copy of the pointer
+Owned box values exist in 1:1 correspondence with their heap allocation,
+copying an owned box value makes a shallow copy of the pointer.
 Rust will consider a shallow copy of an owned box to move ownership of the value. After a value has been moved, the source location cannot be used unless it is reinitialized.
 
 ~~~~

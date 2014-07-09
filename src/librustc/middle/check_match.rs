@@ -22,10 +22,10 @@ use syntax::ast::*;
 use syntax::ast_util::{is_unguarded, walk_pat};
 use syntax::codemap::{Span, Spanned, DUMMY_SP};
 use syntax::owned_slice::OwnedSlice;
-use syntax::print::pprust::pat_to_str;
+use syntax::print::pprust::pat_to_string;
 use syntax::visit;
 use syntax::visit::{Visitor, FnKind};
-use util::ppaux::ty_to_str;
+use util::ppaux::ty_to_string;
 
 struct Matrix(Vec<Vec<Gc<Pat>>>);
 
@@ -47,7 +47,7 @@ impl fmt::Show for Matrix {
 
         let &Matrix(ref m) = self;
         let pretty_printed_matrix: Vec<Vec<String>> = m.iter().map(|row| {
-            row.iter().map(|&pat| pat_to_str(pat)).collect::<Vec<String>>()
+            row.iter().map(|&pat| pat_to_string(pat)).collect::<Vec<String>>()
         }).collect();
 
         let column_count = m.iter().map(|row| row.len()).max().unwrap_or(0u);
@@ -147,7 +147,7 @@ fn check_expr(cx: &mut MatchCheckCtxt, ex: &Expr) {
                    // We know the type is inhabited, so this must be wrong
                    cx.tcx.sess.span_err(ex.span, format!("non-exhaustive patterns: \
                                 type {} is non-empty",
-                                ty_to_str(cx.tcx, pat_ty)).as_slice());
+                                ty_to_string(cx.tcx, pat_ty)).as_slice());
                }
                // If the type *is* empty, it's vacuously exhaustive
                return;
@@ -222,7 +222,8 @@ fn check_exhaustive(cx: &MatchCheckCtxt, sp: Span, m: &Matrix) {
                 [] => wild(),
                 _ => unreachable!()
             };
-            let msg = format!("non-exhaustive patterns: `{0}` not covered", pat_to_str(&*witness));
+            let msg = format!("non-exhaustive patterns: `{0}` not covered",
+                              pat_to_string(&*witness));
             cx.tcx.sess.span_err(sp, msg.as_slice());
         }
         NotUseful => {
@@ -283,13 +284,15 @@ fn construct_witness(cx: &MatchCheckCtxt, ctor: &Constructor,
             };
             if is_structure {
                 let fields = ty::lookup_struct_fields(cx.tcx, vid);
-                let field_pats = fields.move_iter()
+                let field_pats: Vec<FieldPat> = fields.move_iter()
                     .zip(pats.iter())
+                    .filter(|&(_, pat)| pat.node != PatWild)
                     .map(|(field, pat)| FieldPat {
                         ident: Ident::new(field.name),
                         pat: pat.clone()
                     }).collect();
-                PatStruct(def_to_path(cx.tcx, vid), field_pats, false)
+                let has_more_fields = field_pats.len() < pats.len();
+                PatStruct(def_to_path(cx.tcx, vid), field_pats, has_more_fields)
             } else {
                 PatEnum(def_to_path(cx.tcx, vid), Some(pats))
             }
@@ -411,14 +414,7 @@ fn is_useful(cx: &MatchCheckCtxt, matrix @ &Matrix(ref rows): &Matrix,
         return NotUseful;
     }
     let real_pat = match rows.iter().find(|r| r.get(0).id != 0) {
-        Some(r) => {
-            match r.get(0).node {
-                // An arm of the form `ref x @ sub_pat` has type
-                // `sub_pat`, not `&sub_pat` as `x` itself does.
-                PatIdent(BindByRef(_), _, Some(sub)) => sub,
-                _ => *r.get(0)
-            }
-        }
+        Some(r) => raw_pat(*r.get(0)),
         None if v.len() == 0 => return NotUseful,
         None => v[0]
     };
@@ -678,8 +674,17 @@ pub fn specialize(cx: &MatchCheckCtxt, r: &[Gc<Pat>],
                 } else {
                     None
                 },
-                DefStruct(struct_id) => Some(struct_id),
-                _ => None
+                _ => {
+                    // Assume this is a struct.
+                    match ty::ty_to_def_id(node_id_to_type(cx.tcx, pat_id)) {
+                        None => {
+                            cx.tcx.sess.span_bug(pat_span,
+                                                 "struct pattern wasn't of a \
+                                                  type with a def ID?!")
+                        }
+                        Some(def_id) => Some(def_id),
+                    }
+                }
             };
             class_id.map(|variant_id| {
                 let struct_fields = ty::lookup_struct_fields(cx.tcx, variant_id);
@@ -776,7 +781,7 @@ fn check_local(cx: &mut MatchCheckCtxt, loc: &Local) {
         Some(pat) => {
             let msg = format!(
                 "refutable pattern in {} binding: `{}` not covered",
-                name, pat_to_str(&*pat)
+                name, pat_to_string(&*pat)
             );
             cx.tcx.sess.span_err(loc.pat.span, msg.as_slice());
         },
@@ -798,7 +803,7 @@ fn check_fn(cx: &mut MatchCheckCtxt,
             Some(pat) => {
                 let msg = format!(
                     "refutable pattern in function argument: `{}` not covered",
-                    pat_to_str(&*pat)
+                    pat_to_string(&*pat)
                 );
                 cx.tcx.sess.span_err(input.pat.span, msg.as_slice());
             },

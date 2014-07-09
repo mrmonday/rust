@@ -71,7 +71,7 @@ use middle::trans::value::Value;
 use middle::ty;
 use middle::typeck;
 use util::common::indenter;
-use util::ppaux::{Repr, ty_to_str};
+use util::ppaux::{Repr, ty_to_string};
 use util::sha2::Sha256;
 use util::nodemap::NodeMap;
 
@@ -301,7 +301,7 @@ fn require_alloc_fn(bcx: &Block, info_ty: ty::t, it: LangItem) -> ast::DefId {
         Ok(id) => id,
         Err(s) => {
             bcx.sess().fatal(format!("allocation of `{}` {}",
-                                     bcx.ty_to_str(info_ty),
+                                     bcx.ty_to_string(info_ty),
                                      s).as_slice());
         }
     }
@@ -538,8 +538,8 @@ pub fn compare_scalar_values<'a>(
         // We don't need to do actual comparisons for nil.
         // () == () holds but () < () does not.
         match op {
-          ast::BiEq | ast::BiLe | ast::BiGe => return C_i1(cx.ccx(), true),
-          ast::BiNe | ast::BiLt | ast::BiGt => return C_i1(cx.ccx(), false),
+          ast::BiEq | ast::BiLe | ast::BiGe => return C_bool(cx.ccx(), true),
+          ast::BiNe | ast::BiLt | ast::BiGt => return C_bool(cx.ccx(), false),
           // refinements would be nice
           _ => die(cx)
         }
@@ -706,7 +706,7 @@ pub fn iter_structural_ty<'r,
                       let variant_cx =
                           fcx.new_temp_block(
                               format!("enum-iter-variant-{}",
-                                      variant.disr_val.to_str().as_slice())
+                                      variant.disr_val.to_string().as_slice())
                                      .as_slice());
                       match adt::trans_case(cx, &*repr, variant.disr_val) {
                           _match::single_result(r) => {
@@ -809,7 +809,7 @@ pub fn fail_if_zero_or_overflows<'a>(
         }
         _ => {
             cx.sess().bug(format!("fail-if-zero on unexpected type: {}",
-                                  ty_to_str(cx.tcx(), rhs_t)).as_slice());
+                                  ty_to_string(cx.tcx(), rhs_t)).as_slice());
         }
     };
     let bcx = with_cond(cx, is_zero, |bcx| {
@@ -903,7 +903,7 @@ pub fn invoke<'a>(
             debug!("invoke at ???");
         }
         Some(id) => {
-            debug!("invoke at {}", bcx.tcx().map.node_to_str(id));
+            debug!("invoke at {}", bcx.tcx().map.node_to_string(id));
         }
     }
 
@@ -958,8 +958,40 @@ pub fn need_invoke(bcx: &Block) -> bool {
 
 pub fn load_if_immediate(cx: &Block, v: ValueRef, t: ty::t) -> ValueRef {
     let _icx = push_ctxt("load_if_immediate");
-    if type_is_immediate(cx.ccx(), t) { return Load(cx, v); }
+    if type_is_immediate(cx.ccx(), t) { return load_ty(cx, v, t); }
     return v;
+}
+
+pub fn load_ty(cx: &Block, ptr: ValueRef, t: ty::t) -> ValueRef {
+    /*!
+     * Helper for loading values from memory. Does the necessary conversion if
+     * the in-memory type differs from the type used for SSA values. Also
+     * handles various special cases where the type gives us better information
+     * about what we are loading.
+     */
+    if type_is_zero_size(cx.ccx(), t) {
+        C_undef(type_of::type_of(cx.ccx(), t))
+    } else if ty::type_is_bool(t) {
+        Trunc(cx, LoadRangeAssert(cx, ptr, 0, 2, lib::llvm::False), Type::i1(cx.ccx()))
+    } else if ty::type_is_char(t) {
+        // a char is a unicode codepoint, and so takes values from 0
+        // to 0x10FFFF inclusive only.
+        LoadRangeAssert(cx, ptr, 0, 0x10FFFF + 1, lib::llvm::False)
+    } else {
+        Load(cx, ptr)
+    }
+}
+
+pub fn store_ty(cx: &Block, v: ValueRef, dst: ValueRef, t: ty::t) {
+    /*!
+     * Helper for storing values in memory. Does the necessary conversion if
+     * the in-memory type differs from the type used for SSA values.
+     */
+    if ty::type_is_bool(t) {
+        Store(cx, ZExt(cx, v, Type::i8(cx.ccx())), dst);
+    } else {
+        Store(cx, v, dst);
+    };
 }
 
 pub fn ignore_lhs(_bcx: &Block, local: &ast::Local) -> bool {
@@ -1013,7 +1045,7 @@ pub fn call_memcpy(cx: &Block, dst: ValueRef, src: ValueRef, n_bytes: ValueRef, 
     let dst_ptr = PointerCast(cx, dst, Type::i8p(ccx));
     let size = IntCast(cx, n_bytes, ccx.int_type);
     let align = C_i32(ccx, align as i32);
-    let volatile = C_i1(ccx, false);
+    let volatile = C_bool(ccx, false);
     Call(cx, memcpy, [dst_ptr, src_ptr, size, align, volatile], []);
 }
 
@@ -1058,7 +1090,7 @@ fn memzero(b: &Builder, llptr: ValueRef, ty: Type) {
     let llzeroval = C_u8(ccx, 0);
     let size = machine::llsize_of(ccx, ty);
     let align = C_i32(ccx, llalign_of_min(ccx, ty) as i32);
-    let volatile = C_i1(ccx, false);
+    let volatile = C_bool(ccx, false);
     b.call(llintrinsicfn, [llptr, llzeroval, size, align, volatile], []);
 }
 
@@ -1141,7 +1173,7 @@ pub fn new_fn_ctxt<'a>(ccx: &'a CrateContext,
            if id == -1 {
                "".to_string()
            } else {
-               ccx.tcx.map.path_to_str(id).to_string()
+               ccx.tcx.map.path_to_string(id).to_string()
            },
            id, param_substs.repr(ccx.tcx()));
 
@@ -1282,8 +1314,13 @@ fn copy_args_to_allocas<'a>(fcx: &FunctionContext<'a>,
 // Ties up the llstaticallocas -> llloadenv -> lltop edges,
 // and builds the return block.
 pub fn finish_fn<'a>(fcx: &'a FunctionContext<'a>,
-                     last_bcx: &'a Block<'a>) {
+                     last_bcx: &'a Block<'a>,
+                     retty: ty::t) {
     let _icx = push_ctxt("finish_fn");
+
+    // This shouldn't need to recompute the return type,
+    // as new_fn_ctxt did it already.
+    let substd_retty = retty.substp(fcx.ccx.tcx(), fcx.param_substs);
 
     let ret_cx = match fcx.llreturn.get() {
         Some(llreturn) => {
@@ -1294,13 +1331,13 @@ pub fn finish_fn<'a>(fcx: &'a FunctionContext<'a>,
         }
         None => last_bcx
     };
-    build_return_block(fcx, ret_cx);
+    build_return_block(fcx, ret_cx, substd_retty);
     debuginfo::clear_source_location(fcx);
     fcx.cleanup();
 }
 
 // Builds the return block for a function.
-pub fn build_return_block(fcx: &FunctionContext, ret_cx: &Block) {
+pub fn build_return_block(fcx: &FunctionContext, ret_cx: &Block, retty: ty::t) {
     // Return the value if this function immediate; otherwise, return void.
     if fcx.llretptr.get().is_none() || fcx.caller_expects_out_pointer {
         return RetVoid(ret_cx);
@@ -1318,12 +1355,15 @@ pub fn build_return_block(fcx: &FunctionContext, ret_cx: &Block) {
                 retptr.erase_from_parent();
             }
 
-            retval
+            if ty::type_is_bool(retty) {
+                Trunc(ret_cx, retval, Type::i1(fcx.ccx))
+            } else {
+                retval
+            }
         }
         // Otherwise, load the return value from the ret slot
-        None => Load(ret_cx, fcx.llretptr.get().unwrap())
+        None => load_ty(ret_cx, fcx.llretptr.get().unwrap(), retty)
     };
-
 
     Ret(ret_cx, retval);
 }
@@ -1422,7 +1462,7 @@ pub fn trans_closure(ccx: &CrateContext,
     }
 
     // Insert the mandatory first few basic blocks before lltop.
-    finish_fn(&fcx, bcx);
+    finish_fn(&fcx, bcx, output_type);
 }
 
 // trans_fn: creates an LLVM function corresponding to a source language
@@ -1434,7 +1474,7 @@ pub fn trans_fn(ccx: &CrateContext,
                 param_substs: &param_substs,
                 id: ast::NodeId,
                 attrs: &[ast::Attribute]) {
-    let _s = StatRecorder::new(ccx, ccx.tcx.map.path_to_str(id).to_string());
+    let _s = StatRecorder::new(ccx, ccx.tcx.map.path_to_string(id).to_string());
     debug!("trans_fn(param_substs={})", param_substs.repr(ccx.tcx()));
     let _icx = push_ctxt("trans_fn");
     let output_type = ty::ty_fn_ret(ty::node_id_to_type(ccx.tcx(), id));
@@ -1487,7 +1527,7 @@ fn trans_enum_variant_or_tuple_like_struct(ccx: &CrateContext,
         _ => ccx.sess().bug(
             format!("trans_enum_variant_or_tuple_like_struct: \
                      unexpected ctor return type {}",
-                    ty_to_str(ccx.tcx(), ctor_ty)).as_slice())
+                    ty_to_string(ccx.tcx(), ctor_ty)).as_slice())
     };
 
     let arena = TypedArena::new();
@@ -1512,7 +1552,7 @@ fn trans_enum_variant_or_tuple_like_struct(ccx: &CrateContext,
         }
     }
 
-    finish_fn(&fcx, bcx);
+    finish_fn(&fcx, bcx, result_ty);
 }
 
 fn trans_enum_def(ccx: &CrateContext, enum_definition: &ast::EnumDef,
@@ -1970,7 +2010,7 @@ fn exported_name(ccx: &CrateContext, id: ast::NodeId,
         _ => ccx.tcx.map.with_path(id, |mut path| {
             if attr::contains_name(attrs, "no_mangle") {
                 // Don't mangle
-                path.last().unwrap().to_str()
+                path.last().unwrap().to_string()
             } else {
                 match weak_lang_items::link_name(attrs) {
                     Some(name) => name.get().to_string(),

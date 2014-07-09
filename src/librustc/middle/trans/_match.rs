@@ -214,7 +214,7 @@ use middle::trans::type_of;
 use middle::trans::debuginfo;
 use middle::ty;
 use util::common::indenter;
-use util::ppaux::{Repr, vec_map_to_str};
+use util::ppaux::{Repr, vec_map_to_string};
 
 use std;
 use std::collections::HashMap;
@@ -409,29 +409,28 @@ fn expand_nested_bindings<'a, 'b>(
            bcx.to_str(),
            m.repr(bcx.tcx()),
            col,
-           bcx.val_to_str(val));
+           bcx.val_to_string(val));
     let _indenter = indenter();
 
     m.iter().map(|br| {
-        match br.pats.get(col).node {
-            ast::PatIdent(_, ref path1, Some(inner)) => {
-                let pats = Vec::from_slice(br.pats.slice(0u, col))
-                           .append((vec!(inner))
-                                   .append(br.pats.slice(col + 1u, br.pats.len())).as_slice());
+        let mut bound_ptrs = br.bound_ptrs.clone();
+        let mut pat = *br.pats.get(col);
+        loop {
+            pat = match pat.node {
+                ast::PatIdent(_, ref path, Some(inner)) => {
+                    bound_ptrs.push((path.node, val));
+                    inner.clone()
+                },
+                _ => break
+            }
+        }
 
-                let mut bound_ptrs = br.bound_ptrs.clone();
-                bound_ptrs.push((path1.node, val));
-                Match {
-                    pats: pats,
-                    data: &*br.data,
-                    bound_ptrs: bound_ptrs
-                }
-            }
-            _ => Match {
-                pats: br.pats.clone(),
-                data: &*br.data,
-                bound_ptrs: br.bound_ptrs.clone()
-            }
+        let mut pats = br.pats.clone();
+        *pats.get_mut(col) = pat;
+        Match {
+            pats: pats,
+            data: &*br.data,
+            bound_ptrs: bound_ptrs
         }
     }).collect()
 }
@@ -450,7 +449,7 @@ fn enter_match<'a, 'b>(
            bcx.to_str(),
            m.repr(bcx.tcx()),
            col,
-           bcx.val_to_str(val));
+           bcx.val_to_string(val));
     let _indenter = indenter();
 
     m.iter().filter_map(|br| {
@@ -486,7 +485,7 @@ fn enter_default<'a, 'b>(
            bcx.to_str(),
            m.repr(bcx.tcx()),
            col,
-           bcx.val_to_str(val));
+           bcx.val_to_string(val));
     let _indenter = indenter();
 
     // Collect all of the matches that can match against anything.
@@ -542,7 +541,7 @@ fn enter_opt<'a, 'b>(
            m.repr(bcx.tcx()),
            *opt,
            col,
-           bcx.val_to_str(val));
+           bcx.val_to_string(val));
     let _indenter = indenter();
 
     let ctor = match opt {
@@ -804,12 +803,19 @@ fn any_irrefutable_adt_pat(bcx: &Block, m: &[Match], col: uint) -> bool {
         let pat = *br.pats.get(col);
         match pat.node {
             ast::PatTup(_) => true,
-            ast::PatEnum(..) | ast::PatIdent(_, _, None) | ast::PatStruct(..) =>
+            ast::PatStruct(..) => {
+                match bcx.tcx().def_map.borrow().find(&pat.id) {
+                    Some(&def::DefVariant(..)) => false,
+                    _ => true,
+                }
+            }
+            ast::PatEnum(..) | ast::PatIdent(_, _, None) => {
                 match bcx.tcx().def_map.borrow().find(&pat.id) {
                     Some(&def::DefFn(..)) |
                     Some(&def::DefStruct(..)) => true,
                     _ => false
-                },
+                }
+            }
             _ => false
         }
     })
@@ -916,7 +922,7 @@ fn compare_values<'a>(
         let did = langcall(cx,
                            None,
                            format!("comparison of `{}`",
-                                   cx.ty_to_str(rhs_t)).as_slice(),
+                                   cx.ty_to_string(rhs_t)).as_slice(),
                            StrEqFnLangItem);
         callee::trans_lang_call(cx, did, [lhs, rhs], None)
     }
@@ -982,7 +988,7 @@ fn insert_lllocals<'a>(mut bcx: &'a Block<'a>, bindings_map: &BindingsMap,
 
         debug!("binding {:?} to {}",
                binding_info.id,
-               bcx.val_to_str(llval));
+               bcx.val_to_string(llval));
         bcx.fcx.lllocals.borrow_mut().insert(binding_info.id, datum);
 
         if bcx.sess().opts.debuginfo == FullDebugInfo {
@@ -1005,9 +1011,9 @@ fn compile_guard<'a, 'b>(
                  -> &'b Block<'b> {
     debug!("compile_guard(bcx={}, guard_expr={}, m={}, vals={})",
            bcx.to_str(),
-           bcx.expr_to_str(guard_expr),
+           bcx.expr_to_string(guard_expr),
            m.repr(bcx.tcx()),
-           vec_map_to_str(vals, |v| bcx.val_to_str(*v)));
+           vec_map_to_string(vals, |v| bcx.val_to_string(*v)));
     let _indenter = indenter();
 
     let mut bcx = insert_lllocals(bcx, &data.bindings_map, None);
@@ -1044,7 +1050,7 @@ fn compile_submatch<'a, 'b>(
     debug!("compile_submatch(bcx={}, m={}, vals={})",
            bcx.to_str(),
            m.repr(bcx.tcx()),
-           vec_map_to_str(vals, |v| bcx.val_to_str(*v)));
+           vec_map_to_string(vals, |v| bcx.val_to_string(*v)));
     let _indenter = indenter();
     let _icx = push_ctxt("match::compile_submatch");
     let mut bcx = bcx;
@@ -1149,7 +1155,7 @@ fn compile_submatch_continue<'a, 'b>(
     debug!("options={:?}", opts);
     let mut kind = no_branch;
     let mut test_val = val;
-    debug!("test_val={}", bcx.val_to_str(test_val));
+    debug!("test_val={}", bcx.val_to_string(test_val));
     if opts.len() > 0u {
         match *opts.get(0) {
             var(_, ref repr, _) => {

@@ -428,7 +428,7 @@ fn build_index(krate: &clean::Crate, cache: &mut Cache) -> io::IoResult<String> 
         }
         try!(write!(&mut w, r#"[{:u},"{}","{}",{}"#,
                     item.ty, item.name, path,
-                    item.desc.to_json().to_str()));
+                    item.desc.to_json().to_string()));
         match item.parent {
             Some(nodeid) => {
                 let pathid = *nodeid_to_pathid.find(&nodeid).unwrap();
@@ -478,12 +478,16 @@ fn write_shared(cx: &Context,
                include_bin!("static/FiraSans-Regular.woff")));
     try!(write(cx.dst.join("FiraSans-Medium.woff"),
                include_bin!("static/FiraSans-Medium.woff")));
-    try!(write(cx.dst.join("Heuristica-Regular.woff"),
-               include_bin!("static/Heuristica-Regular.woff")));
+    try!(write(cx.dst.join("SourceSerifPro-Bold.woff"),
+               include_bin!("static/SourceSerifPro-Bold.woff")));
     try!(write(cx.dst.join("Heuristica-Italic.woff"),
                include_bin!("static/Heuristica-Italic.woff")));
-    try!(write(cx.dst.join("Heuristica-Bold.woff"),
-               include_bin!("static/Heuristica-Bold.woff")));
+    try!(write(cx.dst.join("SourceSerifPro-Bold.woff"),
+               include_bin!("static/SourceSerifPro-Bold.woff")));
+    try!(write(cx.dst.join("SourceCodePro-Regular.woff"),
+               include_bin!("static/SourceCodePro-Regular.woff")));
+    try!(write(cx.dst.join("SourceCodePro-Semibold.woff"),
+               include_bin!("static/SourceCodePro-Semibold.woff")));
 
     fn collect(path: &Path, krate: &str,
                key: &str) -> io::IoResult<Vec<String>> {

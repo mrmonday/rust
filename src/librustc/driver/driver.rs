@@ -594,7 +594,7 @@ impl pprust::PpAnn for IdentifiedAnnotation {
         match node {
             pprust::NodeItem(item) => {
                 try!(pp::space(&mut s.s));
-                s.synth_comment(item.id.to_str())
+                s.synth_comment(item.id.to_string())
             }
             pprust::NodeBlock(blk) => {
                 try!(pp::space(&mut s.s));
@@ -602,7 +602,7 @@ impl pprust::PpAnn for IdentifiedAnnotation {
             }
             pprust::NodeExpr(expr) => {
                 try!(pp::space(&mut s.s));
-                try!(s.synth_comment(expr.id.to_str()));
+                try!(s.synth_comment(expr.id.to_string()));
                 s.pclose()
             }
             pprust::NodePat(pat) => {
@@ -636,7 +636,7 @@ impl pprust::PpAnn for TypedAnnotation {
                 try!(pp::word(&mut s.s, "as"));
                 try!(pp::space(&mut s.s));
                 try!(pp::word(&mut s.s,
-                              ppaux::ty_to_str(
+                              ppaux::ty_to_string(
                                   tcx,
                                   ty::expr_ty(tcx, expr)).as_slice()));
                 s.pclose()
@@ -903,10 +903,21 @@ pub fn build_output_filenames(input: &Input,
             };
 
             // If a crate name is present, we use it as the link name
-           let stem = match attr::find_crate_name(attrs) {
-                None => input.filestem(),
-                Some(name) => name.get().to_string(),
-            };
+            let stem = sess.opts.crate_name.clone().or_else(|| {
+                attr::find_crate_name(attrs).map(|n| n.get().to_string())
+            }).or_else(|| {
+                // NB: this clause can be removed once #[crate_id] is no longer
+                // deprecated.
+                //
+                // Also note that this will be warned about later so we don't
+                // warn about it here.
+                use syntax::crateid::CrateId;
+                attrs.iter().find(|at| at.check_name("crate_id"))
+                     .and_then(|at| at.value_str())
+                     .and_then(|s| from_str::<CrateId>(s.get()))
+                     .map(|id| id.name)
+            }).unwrap_or(input.filestem());
+
             OutputFilenames {
                 out_directory: dirpath,
                 out_filestem: stem,

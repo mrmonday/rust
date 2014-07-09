@@ -1,4 +1,4 @@
-// Copyright 2013 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2012 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -8,6 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-static i: int =
-    0xu32 //~ ERROR: no valid digits
-;
+pub struct S {
+    pub x: int,
+    pub y: int,
+}
+
+pub type S2 = S;
+

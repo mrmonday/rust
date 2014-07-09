@@ -1,4 +1,4 @@
-// Copyright 2012 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2014 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -8,16 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![crate_type = "lib"]
+#![crate_name = "foo"]
 
-extern crate issue2378a;
+fn main() {}
 
-use issue2378a::maybe;
-
-pub struct two_maybes<T> {pub a: maybe<T>, pub b: maybe<T>}
-
-impl<T:Clone> Index<uint,(T,T)> for two_maybes<T> {
-    fn index(&self, idx: &uint) -> (T, T) {
-        (self.a[*idx], self.b[*idx])
-    }
-}

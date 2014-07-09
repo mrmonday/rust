@@ -1,4 +1,4 @@
-// Copyright 2014 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2012 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -8,6 +8,26 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-fn main() {
-    let h = 0x8.0e+9; //~ ERROR: hexadecimal float literal is not supported
+struct S {
+    x: int,
+    y: int,
 }
+
+type S2 = S;
+
+fn main() {
+    let s = S2 {
+        x: 1,
+        y: 2,
+    };
+    match s {
+        S2 {
+            x: x,
+            y: y
+        } => {
+            assert_eq!(x, 1);
+            assert_eq!(y, 2);
+        }
+    }
+}
+

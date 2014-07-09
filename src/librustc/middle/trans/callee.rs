@@ -108,7 +108,7 @@ fn trans<'a>(bcx: &'a Block<'a>, expr: &ast::Expr) -> Callee<'a> {
                     expr.span,
                     format!("type of callee is neither bare-fn nor closure: \
                              {}",
-                            bcx.ty_to_str(datum.ty)).as_slice());
+                            bcx.ty_to_string(datum.ty)).as_slice());
             }
         }
     }
@@ -345,7 +345,7 @@ pub fn trans_unboxing_shim(bcx: &Block,
                            }).bcx;
 
     bcx = fcx.pop_and_trans_custom_cleanup_scope(bcx, arg_scope);
-    finish_fn(&fcx, bcx);
+    finish_fn(&fcx, bcx, return_type);
 
     llfn
 }
@@ -757,7 +757,7 @@ pub fn trans_call_inner<'a>(
                 if !type_of::return_uses_outptr(bcx.ccx(), ret_ty) &&
                     !type_is_zero_size(bcx.ccx(), ret_ty)
                 {
-                    Store(bcx, llret, llretslot);
+                    store_ty(bcx, llret, llretslot, ret_ty)
                 }
             }
             None => {}
@@ -905,7 +905,7 @@ pub fn trans_arg_datum<'a>(
 
     let arg_datum_ty = arg_datum.ty;
 
-    debug!("   arg datum: {}", arg_datum.to_str(bcx.ccx()));
+    debug!("   arg datum: {}", arg_datum.to_string(bcx.ccx()));
 
     let mut val;
     if ty::type_is_bot(arg_datum_ty) {
@@ -949,11 +949,11 @@ pub fn trans_arg_datum<'a>(
             // this could happen due to e.g. subtyping
             let llformal_arg_ty = type_of::type_of_explicit_arg(ccx, formal_arg_ty);
             debug!("casting actual type ({}) to match formal ({})",
-                   bcx.val_to_str(val), bcx.llty_str(llformal_arg_ty));
+                   bcx.val_to_string(val), bcx.llty_str(llformal_arg_ty));
             val = PointerCast(bcx, val, llformal_arg_ty);
         }
     }
 
-    debug!("--- trans_arg_datum passing {}", bcx.val_to_str(val));
+    debug!("--- trans_arg_datum passing {}", bcx.val_to_string(val));
     Result::new(bcx, val)
 }

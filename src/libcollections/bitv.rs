@@ -16,13 +16,35 @@ use core::cmp;
 use core::default::Default;
 use core::fmt;
 use core::iter::Take;
-use core::ops;
 use core::slice;
 use core::uint;
 use std::hash;
 
 use {Collection, Mutable, Set, MutableSet};
 use vec::Vec;
+
+#[cfg(not(stage0))]
+use core::ops::Index;
+
+#[cfg(not(stage0))]
+static TRUE: bool = true;
+
+#[cfg(not(stage0))]
+static FALSE: bool = false;
+
+#[deriving(Clone)]
+struct SmallBitv {
+    /// only the lowest nbits of this value are used. the rest is undefined.
+    bits: uint
+}
+
+#[deriving(Clone)]
+struct BigBitv {
+    storage: Vec<uint>
+}
+
+#[deriving(Clone)]
+enum BitvVariant { Big(BigBitv), Small(SmallBitv) }
 
 /// The bitvector type
 ///
@@ -38,17 +60,17 @@ use vec::Vec;
 /// bv.set(3, true);
 /// bv.set(5, true);
 /// bv.set(7, true);
-/// println!("{}", bv.to_str());
+/// println!("{}", bv.to_string());
 /// println!("total bits set to true: {}", bv.iter().filter(|x| *x).count());
 ///
 /// // flip all values in bitvector, producing non-primes less than 10
 /// bv.negate();
-/// println!("{}", bv.to_str());
+/// println!("{}", bv.to_string());
 /// println!("total bits set to true: {}", bv.iter().filter(|x| *x).count());
 ///
 /// // reset bitvector to empty
 /// bv.clear();
-/// println!("{}", bv.to_str());
+/// println!("{}", bv.to_string());
 /// println!("total bits set to true: {}", bv.iter().filter(|x| *x).count());
 /// ```
 pub struct Bitv {
@@ -56,6 +78,18 @@ pub struct Bitv {
     storage: Vec<uint>,
     /// The number of valid bits in the internal representation
     nbits: uint
+}
+
+#[cfg(not(stage0))]
+impl Index<uint,bool> for Bitv {
+    #[inline]
+    fn index<'a>(&'a self, i: &uint) -> &'a bool {
+        if self.get(*i) {
+            &TRUE
+        } else {
+            &FALSE
+        }
+    }
 }
 
 struct MaskWords<'a> {
@@ -268,7 +302,7 @@ impl Bitv {
             if offset >= bitv.nbits {
                 0
             } else {
-                bitv[offset] as u8 << (7 - bit)
+                bitv.get(offset) as u8 << (7 - bit)
             }
         }
 
@@ -284,6 +318,13 @@ impl Bitv {
             bit(self, i, 6) |
             bit(self, i, 7)
         )
+    }
+
+    /**
+     * Transform `self` into a `Vec<bool>` by turning each bit into a `bool`.
+     */
+    pub fn to_bools(&self) -> Vec<bool> {
+        Vec::from_fn(self.nbits, |i| self.get(i))
     }
 
     /**
@@ -501,13 +542,6 @@ impl Clone for Bitv {
         self.nbits = source.nbits;
         self.storage.reserve(source.storage.len());
         for (i, w) in self.storage.mut_iter().enumerate() { *w = *source.storage.get(i); }
-    }
-}
-
-impl ops::Index<uint,bool> for Bitv {
-    #[inline]
-    fn index(&self, i: &uint) -> bool {
-        self.get(*i)
     }
 }
 
@@ -962,10 +996,10 @@ mod tests {
     #[test]
     fn test_to_str() {
         let zerolen = Bitv::new();
-        assert_eq!(zerolen.to_str().as_slice(), "");
+        assert_eq!(zerolen.to_string().as_slice(), "");
 
         let eightbits = Bitv::with_capacity(8u, false);
-        assert_eq!(eightbits.to_str().as_slice(), "00000000")
+        assert_eq!(eightbits.to_string().as_slice(), "00000000")
     }
 
     #[test]
@@ -988,7 +1022,7 @@ mod tests {
         let mut b = bitv::Bitv::with_capacity(2, false);
         b.set(0, true);
         b.set(1, false);
-        assert_eq!(b.to_str().as_slice(), "10");
+        assert_eq!(b.to_string().as_slice(), "10");
     }
 
     #[test]
@@ -1299,7 +1333,7 @@ mod tests {
     fn test_from_bytes() {
         let bitv = from_bytes([0b10110110, 0b00000000, 0b11111111]);
         let str = format!("{}{}{}", "10110110", "00000000", "11111111");
-        assert_eq!(bitv.to_str().as_slice(), str.as_slice());
+        assert_eq!(bitv.to_string().as_slice(), str.as_slice());
     }
 
     #[test]
@@ -1318,7 +1352,7 @@ mod tests {
     fn test_from_bools() {
         let bools = vec![true, false, true, true];
         let bitv: Bitv = bools.iter().map(|n| *n).collect();
-        assert_eq!(bitv.to_str().as_slice(), "1011");
+        assert_eq!(bitv.to_string().as_slice(), "1011");
     }
 
     #[test]
@@ -1369,9 +1403,9 @@ mod tests {
         b2.set(1, true);
         b2.set(2, true);
         assert!(b1.difference(&b2));
-        assert!(b1[0]);
-        assert!(!b1[1]);
-        assert!(!b1[2]);
+        assert!(b1.get(0));
+        assert!(!b1.get(1));
+        assert!(!b1.get(2));
     }
 
     #[test]
@@ -1383,9 +1417,9 @@ mod tests {
         b2.set(40, true);
         b2.set(80, true);
         assert!(b1.difference(&b2));
-        assert!(b1[0]);
-        assert!(!b1[40]);
-        assert!(!b1[80]);
+        assert!(b1.get(0));
+        assert!(!b1.get(40));
+        assert!(!b1.get(80));
     }
 
     #[test]
@@ -1753,7 +1787,7 @@ mod tests {
         s.insert(10);
         s.insert(50);
         s.insert(2);
-        assert_eq!("{1, 2, 10, 50}".to_string(), s.to_str());
+        assert_eq!("{1, 2, 10, 50}".to_string(), s.to_string());
     }
 
     fn rng() -> rand::IsaacRng {

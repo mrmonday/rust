@@ -773,7 +773,7 @@ pub fn mangle_exported_name(ccx: &CrateContext, path: PathElems,
 pub fn mangle_internal_name_by_type_and_seq(ccx: &CrateContext,
                                             t: ty::t,
                                             name: &str) -> String {
-    let s = ppaux::ty_to_str(ccx.tcx(), t);
+    let s = ppaux::ty_to_string(ccx.tcx(), t);
     let path = [PathName(token::intern(s.as_slice())),
                 gensym_name(name)];
     let hash = get_symbol_hash(ccx, t);
@@ -1363,7 +1363,7 @@ fn link_args(cmd: &mut Command,
         if sess.targ_cfg.os == abi::OsMacos {
             cmd.args(["-dynamiclib", "-Wl,-dylib"]);
 
-            if !sess.opts.cg.no_rpath {
+            if sess.opts.cg.rpath {
                 let mut v = Vec::from_slice("-Wl,-install_name,@rpath/".as_bytes());
                 v.push_all(out_filename.filename().unwrap());
                 cmd.arg(v.as_slice());
@@ -1382,7 +1382,7 @@ fn link_args(cmd: &mut Command,
     // FIXME (#2397): At some point we want to rpath our guesses as to
     // where extern libraries might live, based on the
     // addl_lib_search_paths
-    if !sess.opts.cg.no_rpath {
+    if sess.opts.cg.rpath {
         cmd.args(rpath::get_rpath_flags(sess, out_filename).as_slice());
     }
 

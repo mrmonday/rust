@@ -30,14 +30,14 @@ itself (note that inherent impls can only be defined in the same
 module as the type itself).
 
 Inherent candidates are not always derived from impls.  If you have a
-trait instance, such as a value of type `Box<ToStr>`, then the trait
-methods (`to_str()`, in this case) are inherently associated with it.
+trait instance, such as a value of type `Box<ToString>`, then the trait
+methods (`to_string()`, in this case) are inherently associated with it.
 Another case is type parameters, in which case the methods of their
 bounds are inherent.
 
 Extension candidates are derived from imported traits.  If I have the
-trait `ToStr` imported, and I call `to_str()` on a value of type `T`,
-then we will go off to find out whether there is an impl of `ToStr`
+trait `ToString` imported, and I call `to_string()` on a value of type `T`,
+then we will go off to find out whether there is an impl of `ToString`
 for `T`.  These kinds of method calls are called "extension methods".
 They can be defined in any module, not only the one that defined `T`.
 Furthermore, you must import the trait to call such a method.
@@ -270,12 +270,12 @@ fn construct_transformed_self_ty_for_object(
         ast::SelfStatic => {
             tcx.sess.span_bug(span, "static method for object type receiver");
         }
-        ast::SelfValue => {
+        ast::SelfValue(_) => {
             let tr = ty::mk_trait(tcx, trait_def_id, obj_substs,
                                   ty::empty_builtin_bounds());
             ty::mk_uniq(tcx, tr)
         }
-        ast::SelfRegion(..) | ast::SelfUniq => {
+        ast::SelfRegion(..) | ast::SelfUniq(..) => {
             let transformed_self_ty = *method_ty.fty.sig.inputs.get(0);
             match ty::get(transformed_self_ty).sty {
                 ty::ty_rptr(r, mt) => { // must be SelfRegion
@@ -376,7 +376,7 @@ impl<'a> LookupContext<'a> {
                    autoderefs: uint)
                    -> Option<Option<MethodCallee>> {
         debug!("search_step: self_ty={} autoderefs={}",
-               self.ty_to_str(self_ty), autoderefs);
+               self.ty_to_string(self_ty), autoderefs);
 
         match self.deref_args {
             check::DontDerefArgs => {
@@ -508,7 +508,7 @@ impl<'a> LookupContext<'a> {
                                             did: DefId,
                                             substs: &subst::Substs) {
         debug!("push_inherent_candidates_from_object(did={}, substs={})",
-               self.did_to_str(did),
+               self.did_to_string(did),
                substs.repr(self.tcx()));
         let _indenter = indenter();
         let tcx = self.tcx();
@@ -733,7 +733,7 @@ impl<'a> LookupContext<'a> {
             None => None,
             Some(method) => {
                 debug!("(searching for autoderef'd method) writing \
-                       adjustment {:?} for {}", adjustment, self.ty_to_str( self_ty));
+                       adjustment {:?} for {}", adjustment, self.ty_to_string( self_ty));
                 match adjustment {
                     Some((self_expr_id, adj)) => {
                         self.fcx.write_adjustment(self_expr_id, adj);
@@ -809,7 +809,7 @@ impl<'a> LookupContext<'a> {
 
     fn auto_slice_vec(&self, mt: ty::mt, autoderefs: uint) -> Option<MethodCallee> {
         let tcx = self.tcx();
-        debug!("auto_slice_vec {}", ppaux::ty_to_str(tcx, mt.ty));
+        debug!("auto_slice_vec {}", ppaux::ty_to_string(tcx, mt.ty));
 
         // First try to borrow to a slice
         let entry = self.search_for_some_kind_of_autorefd_method(
@@ -886,7 +886,7 @@ impl<'a> LookupContext<'a> {
          * `~[]` to `&[]`.
          */
 
-        debug!("search_for_autosliced_method {}", ppaux::ty_to_str(self.tcx(), self_ty));
+        debug!("search_for_autosliced_method {}", ppaux::ty_to_string(self.tcx(), self_ty));
 
         let sty = ty::get(self_ty).sty.clone();
         match sty {
@@ -939,7 +939,7 @@ impl<'a> LookupContext<'a> {
 
             ty_infer(TyVar(_)) => {
                 self.bug(format!("unexpected type: {}",
-                                 self.ty_to_str(self_ty)).as_slice());
+                                 self.ty_to_string(self_ty)).as_slice());
             }
         }
     }
@@ -993,7 +993,7 @@ impl<'a> LookupContext<'a> {
     }
 
     fn search_for_method(&self, rcvr_ty: ty::t) -> Option<MethodCallee> {
-        debug!("search_for_method(rcvr_ty={})", self.ty_to_str(rcvr_ty));
+        debug!("search_for_method(rcvr_ty={})", self.ty_to_string(rcvr_ty));
         let _indenter = indenter();
 
         // I am not sure that inherent methods should have higher
@@ -1094,7 +1094,7 @@ impl<'a> LookupContext<'a> {
         let tcx = self.tcx();
 
         debug!("confirm_candidate(rcvr_ty={}, candidate={})",
-               self.ty_to_str(rcvr_ty),
+               self.ty_to_string(rcvr_ty),
                candidate.repr(self.tcx()));
 
         self.enforce_object_limitations(candidate);
@@ -1177,7 +1177,7 @@ impl<'a> LookupContext<'a> {
             fn_style: bare_fn_ty.fn_style,
             abi: bare_fn_ty.abi.clone(),
         });
-        debug!("after replacing bound regions, fty={}", self.ty_to_str(fty));
+        debug!("after replacing bound regions, fty={}", self.ty_to_string(fty));
 
         // Before, we only checked whether self_ty could be a subtype
         // of rcvr_ty; now we actually make it so (this may cause
@@ -1191,8 +1191,8 @@ impl<'a> LookupContext<'a> {
             Err(_) => {
                 self.bug(format!(
                         "{} was a subtype of {} but now is not?",
-                        self.ty_to_str(rcvr_ty),
-                        self.ty_to_str(transformed_self_ty)).as_slice());
+                        self.ty_to_string(rcvr_ty),
+                        self.ty_to_string(transformed_self_ty)).as_slice());
             }
         }
 
@@ -1227,7 +1227,7 @@ impl<'a> LookupContext<'a> {
                      through an object");
             }
 
-            ast::SelfValue | ast::SelfRegion(..) | ast::SelfUniq => {}
+            ast::SelfValue(_) | ast::SelfRegion(..) | ast::SelfUniq(_) => {}
         }
 
         // reason (a) above
@@ -1288,7 +1288,7 @@ impl<'a> LookupContext<'a> {
     // candidate method's `self_ty`.
     fn is_relevant(&self, rcvr_ty: ty::t, candidate: &Candidate) -> bool {
         debug!("is_relevant(rcvr_ty={}, candidate={})",
-               self.ty_to_str(rcvr_ty), candidate.repr(self.tcx()));
+               self.ty_to_string(rcvr_ty), candidate.repr(self.tcx()));
 
         return match candidate.method_ty.explicit_self {
             SelfStatic => {
@@ -1296,7 +1296,7 @@ impl<'a> LookupContext<'a> {
                 self.report_statics == ReportStaticMethods
             }
 
-            SelfValue => {
+            SelfValue(_) => {
                 debug!("(is relevant?) explicit self is by-value");
                 match ty::get(rcvr_ty).sty {
                     ty::ty_uniq(typ) => {
@@ -1319,7 +1319,7 @@ impl<'a> LookupContext<'a> {
                 }
             }
 
-            SelfRegion(_, m) => {
+            SelfRegion(_, m, _) => {
                 debug!("(is relevant?) explicit self is a region");
                 match ty::get(rcvr_ty).sty {
                     ty::ty_rptr(_, mt) => {
@@ -1339,7 +1339,7 @@ impl<'a> LookupContext<'a> {
                 }
             }
 
-            SelfUniq => {
+            SelfUniq(_) => {
                 debug!("(is relevant?) explicit self is a unique pointer");
                 match ty::get(rcvr_ty).sty {
                     ty::ty_uniq(typ) => {
@@ -1457,11 +1457,11 @@ impl<'a> LookupContext<'a> {
         self.fcx.tcx()
     }
 
-    fn ty_to_str(&self, t: ty::t) -> String {
-        self.fcx.infcx().ty_to_str(t)
+    fn ty_to_string(&self, t: ty::t) -> String {
+        self.fcx.infcx().ty_to_string(t)
     }
 
-    fn did_to_str(&self, did: DefId) -> String {
+    fn did_to_string(&self, did: DefId) -> String {
         ty::item_path_str(self.tcx(), did)
     }
 

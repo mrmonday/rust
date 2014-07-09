@@ -1,4 +1,4 @@
-// Copyright 2013 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2012 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -8,6 +8,24 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-static f: float =
-    0x539.0 //~ ERROR: hexadecimal float literal is not supported
-;
+// aux-build:xcrate_struct_aliases.rs
+extern crate xcrate_struct_aliases;
+
+use xcrate_struct_aliases::{S, S2};
+
+fn main() {
+    let s = S2 {
+        x: 1,
+        y: 2,
+    };
+    match s {
+        S2 {
+            x: x,
+            y: y
+        } => {
+            assert_eq!(x, 1);
+            assert_eq!(y, 2);
+        }
+    }
+}
+
