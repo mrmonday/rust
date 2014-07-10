@@ -306,12 +306,15 @@
 //!
 //! ## Perl character classes (Unicode friendly)
 //!
+//! These classes are based on the definitions provided in
+//! [UTS#18](http://www.unicode.org/reports/tr18/#Compatibility_Properties):
+//!
 //! <pre class="rust">
-//! \d     digit ([0-9] + \p{Nd})
+//! \d     digit (\p{Nd})
 //! \D     not digit
-//! \s     whitespace ([\t\n\f\r ] + \p{Z})
+//! \s     whitespace (\p{White_Space})
 //! \S     not whitespace
-//! \w     word character ([0-9A-Za-z_] + \p{L})
+//! \w     word character (\p{Alphabetic} + \p{M} + \d + \p{Pc} + \p{Join_Control})
 //! \W     not word character
 //! </pre>
 //!
@@ -353,7 +356,6 @@
 //! characters in the search text and `m` is the number of instructions in a
 //! compiled expression.
 
-#![crate_id = "regex#0.11.0"] // NOTE: remove after stage0
 #![crate_name = "regex"]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
@@ -365,7 +367,6 @@
        html_playground_url = "http://play.rust-lang.org/")]
 
 #![feature(macro_rules, phase)]
-#![allow(unused_attribute)] // NOTE: remove after stage0
 #![deny(missing_doc)]
 
 #[cfg(test)]
@@ -377,6 +378,9 @@ extern crate rand;
 // can be tested.
 #[cfg(test)]
 extern crate regex;
+
+// unicode tables for character classes are defined in libunicode
+extern crate unicode;
 
 pub use parse::Error;
 pub use re::{Regex, Captures, SubCaptures, SubCapturesPos};

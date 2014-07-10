@@ -16,6 +16,7 @@ use core::cmp;
 use core::default::Default;
 use core::fmt;
 use core::iter::Take;
+use core::ops::Index;
 use core::slice;
 use core::uint;
 use std::hash;
@@ -23,13 +24,8 @@ use std::hash;
 use {Collection, Mutable, Set, MutableSet};
 use vec::Vec;
 
-#[cfg(not(stage0))]
-use core::ops::Index;
 
-#[cfg(not(stage0))]
 static TRUE: bool = true;
-
-#[cfg(not(stage0))]
 static FALSE: bool = false;
 
 #[deriving(Clone)]
@@ -80,7 +76,6 @@ pub struct Bitv {
     nbits: uint
 }
 
-#[cfg(not(stage0))]
 impl Index<uint,bool> for Bitv {
     #[inline]
     fn index<'a>(&'a self, i: &uint) -> &'a bool {
@@ -1426,18 +1421,14 @@ mod tests {
     fn test_small_clear() {
         let mut b = Bitv::with_capacity(14, true);
         b.clear();
-        BitvSet::from_bitv(b).iter().advance(|i| {
-            fail!("found 1 at {:?}", i)
-        });
+        assert!(b.none());
     }
 
     #[test]
     fn test_big_clear() {
         let mut b = Bitv::with_capacity(140, true);
         b.clear();
-        BitvSet::from_bitv(b).iter().advance(|i| {
-            fail!("found 1 at {:?}", i)
-        });
+        assert!(b.none());
     }
 
     #[test]
@@ -1494,14 +1485,9 @@ mod tests {
         assert!(b.insert(5));
         assert!(b.insert(3));
 
-        let mut i = 0;
         let expected = [3, 5, 11, 77];
-        a.intersection(&b).advance(|x| {
-            assert_eq!(x, expected[i]);
-            i += 1;
-            true
-        });
-        assert_eq!(i, expected.len());
+        let actual = a.intersection(&b).collect::<Vec<uint>>();
+        assert_eq!(actual.as_slice(), expected.as_slice());
     }
 
     #[test]
@@ -1518,14 +1504,9 @@ mod tests {
         assert!(b.insert(3));
         assert!(b.insert(200));
 
-        let mut i = 0;
         let expected = [1, 5, 500];
-        a.difference(&b).advance(|x| {
-            assert_eq!(x, expected[i]);
-            i += 1;
-            true
-        });
-        assert_eq!(i, expected.len());
+        let actual = a.difference(&b).collect::<Vec<uint>>();
+        assert_eq!(actual.as_slice(), expected.as_slice());
     }
 
     #[test]
@@ -1544,14 +1525,9 @@ mod tests {
         assert!(b.insert(14));
         assert!(b.insert(220));
 
-        let mut i = 0;
         let expected = [1, 5, 11, 14, 220];
-        a.symmetric_difference(&b).advance(|x| {
-            assert_eq!(x, expected[i]);
-            i += 1;
-            true
-        });
-        assert_eq!(i, expected.len());
+        let actual = a.symmetric_difference(&b).collect::<Vec<uint>>();
+        assert_eq!(actual.as_slice(), expected.as_slice());
     }
 
     #[test]
@@ -1573,14 +1549,9 @@ mod tests {
         assert!(b.insert(13));
         assert!(b.insert(19));
 
-        let mut i = 0;
         let expected = [1, 3, 5, 9, 11, 13, 19, 24, 160];
-        a.union(&b).advance(|x| {
-            assert_eq!(x, expected[i]);
-            i += 1;
-            true
-        });
-        assert_eq!(i, expected.len());
+        let actual = a.union(&b).collect::<Vec<uint>>();
+        assert_eq!(actual.as_slice(), expected.as_slice());
     }
 
     #[test]

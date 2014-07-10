@@ -182,7 +182,7 @@ impl IoFactory for UvIoFactory {
             rtio::DontClose => false
         };
 
-        SocketWatcher::new(self, fd, close).map(|sw| box sw as Box<rtio::RtioCustomSocket + Send>)
+        SocketWatcher::new(self, fd as uvll::uv_os_socket_t, close).map(|sw| box sw as Box<rtio::RtioCustomSocket + Send>)
     }
 
     fn fs_from_raw_fd(&mut self, fd: c_int, close: rtio::CloseBehavior)

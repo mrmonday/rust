@@ -94,7 +94,6 @@
 //! all the standard macros, such as `assert!`, `fail!`, `println!`,
 //! and `format!`, also available to all Rust code.
 
-#![crate_id = "std#0.11.0"] // NOTE: remove after stage0 snap
 #![crate_name = "std"]
 #![unstable]
 #![comment = "The Rust standard library"]
@@ -108,7 +107,6 @@
 
 #![feature(macro_rules, globs, managed_boxes, linkage)]
 #![feature(default_type_params, phase, lang_items, unsafe_destructor)]
-#![allow(unused_attribute)] // NOTE: remove after stage0
 
 // Don't link to std. We are std.
 #![no_std]
@@ -126,6 +124,7 @@
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
 
 extern crate alloc;
+extern crate unicode;
 extern crate core;
 extern crate core_collections = "collections";
 extern crate core_rand = "rand";
@@ -148,7 +147,6 @@ extern crate rustrt;
 pub use core::any;
 pub use core::bool;
 pub use core::cell;
-pub use core::char;
 pub use core::clone;
 #[cfg(not(test))] pub use core::cmp;
 pub use core::default;
@@ -179,6 +177,8 @@ pub use core_collections::vec;
 
 pub use rustrt::c_str;
 pub use rustrt::local_data;
+
+pub use unicode::char;
 
 pub use core_sync::comm;
 

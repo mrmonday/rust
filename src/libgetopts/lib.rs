@@ -76,7 +76,6 @@
 //! }
 //! ~~~
 
-#![crate_id = "getopts#0.11.0"] // NOTE: remove after stage0
 #![crate_name = "getopts"]
 #![experimental]
 #![crate_type = "rlib"]
@@ -88,7 +87,6 @@
        html_playground_url = "http://play.rust-lang.org/")]
 #![feature(globs, phase)]
 #![deny(missing_doc)]
-#![allow(unused_attribute)] // NOTE: remove after stage0
 
 #[cfg(test)] extern crate debug;
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
@@ -896,7 +894,7 @@ fn each_split_within<'a>(ss: &'a str, lim: uint, it: |&'a str| -> bool)
         *cont
     };
 
-    ss.char_indices().advance(|x| machine(&mut cont, x));
+    ss.char_indices().all(|x| machine(&mut cont, x));
 
     // Let the automaton 'run out' by supplying trailing whitespace
     while cont && match state { B | C => true, A => false } {

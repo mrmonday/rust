@@ -9,7 +9,6 @@
 // except according to those terms.
 
 #![feature(globs)]
-#![crate_id = "libc#0.11.0"] // NOTE: remove after a stage0 snap
 #![crate_name = "libc"]
 #![experimental]
 #![no_std] // we don't need std, and we can't have std, since it doesn't exist
@@ -19,7 +18,6 @@
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/0.11.0/",
        html_playground_url = "http://play.rust-lang.org/")]
-#![allow(unused_attribute)] // NOTE: remove after stage0
 
 /*!
 * Bindings for the C standard library and other platform libraries
@@ -95,7 +93,7 @@ pub use types::common::c99::{uint8_t, uint16_t, uint32_t, uint64_t};
 pub use types::common::posix88::{DIR, dirent_t};
 pub use types::os::common::posix01::{timeval};
 pub use types::os::common::bsd44::{addrinfo, in_addr, in6_addr, sockaddr_storage};
-pub use types::os::common::bsd44::{ip_mreq, ip6_mreq, sockaddr, sockaddr_un, ifaddrs};
+pub use types::os::common::bsd44::{ip_mreq, ip6_mreq, sockaddr, sockaddr_un};
 pub use types::os::common::bsd44::{sa_family_t, sockaddr_in, sockaddr_in6, socklen_t};
 pub use types::os::arch::c95::{c_char, c_double, c_float, c_int, c_uint};
 pub use types::os::arch::c95::{c_long, c_short, c_uchar, c_ulong, wchar_t};
@@ -125,7 +123,7 @@ pub use consts::os::bsd44::{SO_REUSEADDR, SO_BROADCAST, SHUT_WR, IP_MULTICAST_LO
 pub use consts::os::bsd44::{IP_ADD_MEMBERSHIP, IP_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IPV6_ADD_MEMBERSHIP, IPV6_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IP_MULTICAST_TTL, IP_TTL, SHUT_RD};
-pub use consts::os::extra::{IPPROTO_RAW, O_NONBLOCK};
+pub use consts::os::extra::{IPPROTO_RAW};
 
 pub use funcs::c95::ctype::{isalnum, isalpha, iscntrl, isdigit};
 pub use funcs::c95::ctype::{islower, isprint, ispunct, isspace};
@@ -156,11 +154,10 @@ pub use funcs::posix88::unistd::{access, chdir, close, dup, dup2};
 pub use funcs::posix88::unistd::{execv, execve, execvp, getcwd};
 pub use funcs::posix88::unistd::{getpid, isatty, lseek, pipe, read};
 pub use funcs::posix88::unistd::{rmdir, unlink, write};
-pub use funcs::posix88::net::{if_nametoindex};
 
 pub use funcs::bsd43::{socket, setsockopt, bind, send, recv, recvfrom};
 pub use funcs::bsd43::{listen, sendto, accept, connect, getpeername, getsockname};
-pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
+pub use funcs::bsd43::{shutdown};
 
 // But we also reexport most everything
 // if you're interested in writing platform-specific code.
@@ -184,12 +181,14 @@ pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
 #[cfg(unix)] pub use consts::os::posix88::{SIGTERM, SIGKILL, SIGPIPE, PROT_NONE};
 #[cfg(unix)] pub use consts::os::posix01::{SIG_IGN, F_GETFL, F_SETFL};
 #[cfg(unix)] pub use consts::os::bsd44::{AF_UNIX};
+#[cfg(unix)] pub use consts::os::extra::{O_NONBLOCK};
 
 #[cfg(unix)] pub use types::os::common::posix01::{pthread_t, timespec, timezone};
 
 #[cfg(unix)] pub use types::os::arch::posix88::{uid_t, gid_t};
 #[cfg(unix)] pub use types::os::arch::posix01::{pthread_attr_t};
 #[cfg(unix)] pub use types::os::arch::posix01::{stat, utimbuf};
+#[cfg(unix)] pub use types::os::common::bsd44::{ifaddrs};
 #[cfg(unix)] pub use funcs::posix88::unistd::{sysconf, setgid, setsid, setuid, pread, pwrite};
 #[cfg(unix)] pub use funcs::posix88::unistd::{getgid, getuid};
 #[cfg(unix)] pub use funcs::posix88::unistd::{_PC_NAME_MAX, utime, nanosleep, pathconf, link};
@@ -197,9 +196,11 @@ pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
 #[cfg(unix)] pub use funcs::posix88::mman::{mmap, munmap, mprotect};
 #[cfg(unix)] pub use funcs::posix88::dirent::{opendir, readdir_r, closedir};
 #[cfg(unix)] pub use funcs::posix88::fcntl::{fcntl};
+#[cfg(unix)] pub use funcs::posix88::net::{if_nametoindex};
 #[cfg(unix)] pub use funcs::posix01::stat_::{lstat};
 #[cfg(unix)] pub use funcs::posix01::unistd::{fsync, ftruncate};
 #[cfg(unix)] pub use funcs::posix01::unistd::{readlink, symlink};
+#[cfg(unix)] pub use funcs::bsd43::{getifaddrs, freeifaddrs};
 
 #[cfg(windows)] pub use consts::os::c95::{WSAECONNREFUSED, WSAECONNRESET, WSAEACCES};
 #[cfg(windows)] pub use consts::os::c95::{WSAEWOULDBLOCK, WSAENOTCONN, WSAECONNABORTED};
@@ -240,6 +241,7 @@ pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
 #[cfg(windows)] pub use consts::os::extra::{ERROR_PIPE_CONNECTED, WAIT_OBJECT_0};
 #[cfg(windows)] pub use consts::os::extra::{ERROR_NOT_FOUND};
 #[cfg(windows)] pub use consts::os::extra::{ERROR_OPERATION_ABORTED};
+#[cfg(windows)] pub use consts::os::extra::{FIONBIO};
 #[cfg(windows)] pub use types::os::common::bsd44::{SOCKET};
 #[cfg(windows)] pub use types::os::common::posix01::{stat, utimbuf};
 #[cfg(windows)] pub use types::os::arch::extra::{HANDLE, BOOL, LPSECURITY_ATTRIBUTES};
@@ -272,6 +274,7 @@ pub use funcs::bsd43::{shutdown, getifaddrs, freeifaddrs};
 #[cfg(windows)] pub use funcs::extra::kernel32::{DisconnectNamedPipe, OpenProcess};
 #[cfg(windows)] pub use funcs::extra::kernel32::{MoveFileExW, VirtualProtect};
 #[cfg(windows)] pub use funcs::extra::msvcrt::{get_osfhandle, open_osfhandle};
+#[cfg(windows)] pub use funcs::extra::winsock::{ioctlsocket};
 
 #[cfg(target_os = "linux")] #[cfg(target_os = "android")] #[cfg(target_os = "freebsd")]
 pub use consts::os::posix01::{CLOCK_REALTIME, CLOCK_MONOTONIC};
