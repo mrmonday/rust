@@ -281,7 +281,7 @@ pub use funcs::posix01::unistd::{fdatasync};
 #[cfg(target_os = "linux")] #[cfg(target_os = "android")]
 pub use types::os::arch::extra::{sockaddr_ll};
 #[cfg(target_os = "linux")] #[cfg(target_os = "android")]
-pub use types::os::arch::extra::{AF_PACKET};
+pub use consts::os::extra::{AF_PACKET};
 
 #[cfg(unix, not(target_os = "freebsd"))]
 pub use consts::os::extra::{MAP_STACK};
