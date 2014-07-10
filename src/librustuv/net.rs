@@ -838,6 +838,8 @@ fn last_error() -> IoError {
 
 #[cfg(not(windows))]
 fn last_error() -> IoError {
+    use std::os;
+
     let errno = os::errno() as uint;
     IoError {
         code: os::errno() as uint,
