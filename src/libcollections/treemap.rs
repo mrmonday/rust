@@ -88,27 +88,18 @@ impl<K: Ord, V> Mutable for TreeMap<K, V> {
 }
 
 impl<K: Ord, V> Map<K, V> for TreeMap<K, V> {
+    // See comments on tree_find_with
+    #[inline]
     fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-        let mut current: &'a Option<Box<TreeNode<K, V>>> = &self.root;
-        loop {
-            match *current {
-              Some(ref r) => {
-                match key.cmp(&r.key) {
-                  Less => current = &r.left,
-                  Greater => current = &r.right,
-                  Equal => return Some(&r.value)
-                }
-              }
-              None => return None
-            }
-        }
+        tree_find_with(&self.root, |k2| key.cmp(k2))
     }
 }
 
 impl<K: Ord, V> MutableMap<K, V> for TreeMap<K, V> {
+    // See comments on def_tree_find_mut_with
     #[inline]
     fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
-        find_mut(&mut self.root, key)
+        tree_find_mut_with(&mut self.root, |x| key.cmp(x))
     }
 
     fn swap(&mut self, key: K, value: V) -> Option<V> {
@@ -178,6 +169,55 @@ impl<K: Ord, V> TreeMap<K, V> {
             stack: stk,
             remaining: length
         }
+    }
+}
+
+impl<K, V> TreeMap<K, V> {
+    /// Return the value for which f(key) returns Equal. f is invoked
+    /// with current key and helps to navigate the tree
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::ascii::StrAsciiExt;
+    ///
+    /// let mut t = collections::treemap::TreeMap::new();
+    /// t.insert("Content-Type", "application/xml");
+    /// t.insert("User-Agent", "Curl-Rust/0.1");
+    ///
+    /// let ua_key = "user-agent";
+    /// let ua = t.find_with(|&k| {
+    ///    ua_key.cmp(&k.to_ascii_lower().as_slice())
+    /// });
+    ///
+    /// assert_eq!(*ua.unwrap(), "Curl-Rust/0.1");
+    /// ```
+    #[inline]
+    pub fn find_with<'a>(&'a self, f:|&K| -> Ordering) -> Option<&'a V> {
+        tree_find_with(&self.root, f)
+    }
+
+    /// Return the value for which f(key) returns Equal. f is invoked
+    /// with current key and helps to navigate the tree
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut t = collections::treemap::TreeMap::new();
+    /// t.insert("Content-Type", "application/xml");
+    /// t.insert("User-Agent", "Curl-Rust/0.1");
+    ///
+    /// let new_ua = "Safari/156.0";
+    /// match t.find_mut_with(|k| "User-Agent".cmp(k)) {
+    ///    Some(x) => *x = new_ua,
+    ///    None => fail!(),
+    /// }
+    ///
+    /// assert_eq!(t.find(&"User-Agent"), Some(&new_ua));
+    /// ```
+    #[inline]
+    pub fn find_mut_with<'a>(&'a mut self, f:|&K| -> Ordering) -> Option<&'a mut V> {
+        tree_find_mut_with(&mut self.root, f)
     }
 }
 
@@ -840,18 +880,48 @@ fn split<K: Ord, V>(node: &mut Box<TreeNode<K, V>>) {
     }
 }
 
-fn find_mut<'r, K: Ord, V>(node: &'r mut Option<Box<TreeNode<K, V>>>,
-                                key: &K)
-                             -> Option<&'r mut V> {
-    match *node {
-      Some(ref mut x) => {
-        match key.cmp(&x.key) {
-          Less => find_mut(&mut x.left, key),
-          Greater => find_mut(&mut x.right, key),
-          Equal => Some(&mut x.value),
+// Next 2 functions have the same conventions
+//
+// The only difference is that non-mutable version uses loop instead
+// of recursion (performance considerations)
+// It seems to be impossible to avoid recursion with mutability
+//
+// So convention is that comparator is gets at input current key
+// and returns search_key cmp cur_key (i.e. search_key.cmp(cur_key))
+fn tree_find_with<'r, K, V>(node: &'r Option<Box<TreeNode<K, V>>>,
+                            f: |&K| -> Ordering) -> Option<&'r V> {
+    let mut current: &'r Option<Box<TreeNode<K, V>>> = node;
+    loop {
+        match *current {
+            Some(ref r) => {
+                match f(&r.key) {
+                    Less => current = &r.left,
+                    Greater => current = &r.right,
+                    Equal => return Some(&r.value)
+                }
+            }
+            None => return None
         }
-      }
-      None => None
+    }
+}
+
+// See comments above tree_find_with
+fn tree_find_mut_with<'r, K, V>(node: &'r mut Option<Box<TreeNode<K, V>>>,
+                                f: |&K| -> Ordering) -> Option<&'r mut V> {
+
+    let mut current = node;
+    loop {
+        let temp = current; // hack to appease borrowck
+        match *temp {
+            Some(ref mut r) => {
+                match f(&r.key) {
+                    Less => current = &mut r.left,
+                    Greater => current = &mut r.right,
+                    Equal => return Some(&mut r.value)
+                }
+            }
+            None => return None
+        }
     }
 }
 
@@ -1027,6 +1097,30 @@ mod test_treemap {
     }
 
     #[test]
+    fn find_with_empty() {
+        let m: TreeMap<&'static str,int> = TreeMap::new();
+        assert!(m.find_with(|k| "test".cmp(k)) == None);
+    }
+
+    #[test]
+    fn find_with_not_found() {
+        let mut m = TreeMap::new();
+        assert!(m.insert("test1", 2i));
+        assert!(m.insert("test2", 3i));
+        assert!(m.insert("test3", 3i));
+        assert_eq!(m.find_with(|k| "test4".cmp(k)), None);
+    }
+
+    #[test]
+    fn find_with_found() {
+        let mut m = TreeMap::new();
+        assert!(m.insert("test1", 2i));
+        assert!(m.insert("test2", 3i));
+        assert!(m.insert("test3", 4i));
+        assert_eq!(m.find_with(|k| "test2".cmp(k)), Some(&3i));
+    }
+
+    #[test]
     fn test_find_mut() {
         let mut m = TreeMap::new();
         assert!(m.insert(1i, 12i));
@@ -1037,6 +1131,19 @@ mod test_treemap {
           None => fail!(), Some(x) => *x = new
         }
         assert_eq!(m.find(&5), Some(&new));
+    }
+
+    #[test]
+    fn test_find_with_mut() {
+        let mut m = TreeMap::new();
+        assert!(m.insert("t1", 12i));
+        assert!(m.insert("t2", 8));
+        assert!(m.insert("t5", 14));
+        let new = 100;
+        match m.find_mut_with(|k| "t5".cmp(k)) {
+          None => fail!(), Some(x) => *x = new
+        }
+        assert_eq!(m.find_with(|k| "t5".cmp(k)), Some(&new));
     }
 
     #[test]
@@ -1663,7 +1770,7 @@ mod test_set {
     #[test]
     fn test_intersection() {
         fn check_intersection(a: &[int], b: &[int], expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.intersection(y).advance(f))
+            check(a, b, expected, |x, y, f| x.intersection(y).all(f))
         }
 
         check_intersection([], [], []);
@@ -1679,7 +1786,7 @@ mod test_set {
     #[test]
     fn test_difference() {
         fn check_difference(a: &[int], b: &[int], expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.difference(y).advance(f))
+            check(a, b, expected, |x, y, f| x.difference(y).all(f))
         }
 
         check_difference([], [], []);
@@ -1697,7 +1804,7 @@ mod test_set {
     fn test_symmetric_difference() {
         fn check_symmetric_difference(a: &[int], b: &[int],
                                       expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.symmetric_difference(y).advance(f))
+            check(a, b, expected, |x, y, f| x.symmetric_difference(y).all(f))
         }
 
         check_symmetric_difference([], [], []);
@@ -1712,7 +1819,7 @@ mod test_set {
     fn test_union() {
         fn check_union(a: &[int], b: &[int],
                                       expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.union(y).advance(f))
+            check(a, b, expected, |x, y, f| x.union(y).all(f))
         }
 
         check_union([], [], []);
