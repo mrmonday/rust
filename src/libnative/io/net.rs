@@ -764,7 +764,7 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub fn new(sock: libc::c_int, close_on_drop: bool) -> IoResult<Socket>
+    pub fn new(sock: sock_t, close_on_drop: bool) -> IoResult<Socket>
     {
         let socket = Socket { fd: sock, close_on_drop: close_on_drop };
         return Ok(socket);

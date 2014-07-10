@@ -12,7 +12,6 @@ use libc::{size_t, ssize_t, c_int, c_void, c_uint};
 use libc;
 use std::intrinsics;
 use std::mem;
-use std::os;
 use std::ptr;
 use std::rt::rtio;
 use std::rt::rtio::IoError;
@@ -829,7 +828,7 @@ pub fn net_buflen(buf: &[u8]) -> u64 {
 #[cfg(windows)]
 fn last_error() -> IoError {
     use std::os;
-    let code = unsafe { c::WSAGetLastError() as uint };
+    let code = unsafe { libc::GetLastError() as uint };
     IoError {
         code: code,
         extra: 0,
@@ -850,8 +849,8 @@ fn last_error() -> IoError {
 
 #[cfg(windows)]
 fn make_nonblocking(socket: libc::SOCKET) -> Option<IoError> {
-    let one: libc::c_ulong = 1;
-    if unsafe { libc::ioctlsocket(socket, libc::FIONBIO, &one as *const libc::c_ulong) } != 0 {
+    let mut one: libc::c_ulong = 1;
+    if unsafe { libc::ioctlsocket(socket, libc::FIONBIO, &mut one as *mut libc::c_ulong) } != 0 {
         Some(last_error())
     } else {
         None
@@ -871,7 +870,7 @@ fn make_nonblocking(socket: c_int) -> Option<IoError> {
 }
 
 impl SocketWatcher {
-    pub fn new(io: &mut UvIoFactory, socket: libc::c_int, close_on_drop: bool)
+    pub fn new(io: &mut UvIoFactory, socket: uvll::uv_os_socket_t, close_on_drop: bool)
         -> Result<SocketWatcher, IoError>
     {
         let handle = unsafe { uvll::malloc_handle(uvll::UV_POLL) };
@@ -920,7 +919,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
         struct Ctx<'b> {
             task: Option<BlockedTask>,
             buf: &'b [u8],
-            result: Option<ssize_t>,
+            result: Option<Result<ssize_t, IoError>>,
             socket: Option<uvll::uv_os_socket_t>,
             addr: *mut libc::sockaddr_storage
         }
@@ -939,11 +938,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
                 wait_until_woken_after(&mut cx.task, &self.uv_loop(), || {
                     unsafe { uvll::set_data_for_uv_handle(self.handle, &mut cx) }
                 });
-                match cx.result.take_unwrap() {
-                    n if n < 0 =>
-                        Err(IoError { code: n as uint, extra: 0, detail: Some(os::error_string(n as uint)) }),
-                    n => Ok(n as uint)
-                }
+                cx.result.unwrap().map(|n| n as uint)
             }
             n => Err(uv_error_to_io_error(UvError(n)))
         };
@@ -956,7 +951,7 @@ impl rtio::RtioCustomSocket for SocketWatcher {
             };
 
             if status < 0 {
-                cx.result = Some(status as ssize_t);
+                cx.result = Some(Err(uv_error_to_io_error(UvError(status))));
                 wakeup(&mut cx.task);
                 return;
             }
@@ -980,12 +975,12 @@ impl rtio::RtioCustomSocket for SocketWatcher {
                 _   => -1
             };
             if len == -1 {
-                cx.result = Some(-os::errno() as ssize_t);
+                cx.result = Some(Err(last_error()));
                 wakeup(&mut cx.task);
                 return;
             }
 
-            cx.result = Some(len as ssize_t);
+            cx.result = Some(Ok(len as ssize_t));
 
             wakeup(&mut cx.task);
         }

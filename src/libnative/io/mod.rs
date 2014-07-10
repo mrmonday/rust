@@ -216,7 +216,7 @@ impl rtio::IoFactory for IoFactory {
             rtio::DontClose => false
         };
 
-        net::Socket::new(fd, close).map(|s| box s as Box<rtio::RtioCustomSocket + Send>)
+        net::Socket::new(fd as net::sock_t, close).map(|s| box s as Box<rtio::RtioCustomSocket + Send>)
     }
 
     // filesystem operations
