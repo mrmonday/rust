@@ -9,10 +9,7 @@
 // except according to those terms.
 
 fn main() {
-    print!(test!());
-    //~^ ERROR: macro undefined: 'test!'
-    //~^^ ERROR: format argument must be a string literal
-
-    concat!(test!());
-    //~^ ERROR: macro undefined: 'test!'
+    let x : i16 = 22;
+    ((&x) as *const i16) as f32;
+    //~^ ERROR: cannot cast from pointer to float directly: `*const i16` as `f32`
 }
