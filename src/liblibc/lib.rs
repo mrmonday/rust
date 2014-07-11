@@ -122,7 +122,7 @@ pub use consts::os::bsd44::{SOL_SOCKET, SO_KEEPALIVE, SO_ERROR};
 pub use consts::os::bsd44::{SO_REUSEADDR, SO_BROADCAST, SHUT_WR, IP_MULTICAST_LOOP};
 pub use consts::os::bsd44::{IP_ADD_MEMBERSHIP, IP_DROP_MEMBERSHIP};
 pub use consts::os::bsd44::{IPV6_ADD_MEMBERSHIP, IPV6_DROP_MEMBERSHIP};
-pub use consts::os::bsd44::{IP_MULTICAST_TTL, IP_TTL, SHUT_RD};
+pub use consts::os::bsd44::{IP_MULTICAST_TTL, IP_TTL, IP_HDRINCL, SHUT_RD};
 pub use consts::os::extra::{IPPROTO_RAW};
 
 pub use funcs::c95::ctype::{isalnum, isalpha, iscntrl, isdigit};
@@ -3126,6 +3126,7 @@ pub mod consts {
             pub static IP_MULTICAST_TTL: c_int = 10;
             pub static IP_MULTICAST_LOOP: c_int = 11;
             pub static IP_TTL: c_int = 4;
+            pub static IP_HDRINCL: c_int = 2;
             pub static IP_ADD_MEMBERSHIP: c_int = 12;
             pub static IP_DROP_MEMBERSHIP: c_int = 13;
             pub static IPV6_ADD_MEMBERSHIP: c_int = 12;
