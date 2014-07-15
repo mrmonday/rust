@@ -78,7 +78,7 @@
 //! passing. [`sync`](sync/index.html) contains further, primitive, shared
 //! memory types, including [`atomics`](sync/atomics/index.html).
 //!
-//! Common types of I/O, including files, TCP, UPD, pipes, Unix domain sockets,
+//! Common types of I/O, including files, TCP, UDP, pipes, Unix domain sockets,
 //! timers, and process spawning, are defined in the [`io`](io/index.html) module.
 //!
 //! Rust's I/O and concurrency depends on a small runtime interface
@@ -102,7 +102,7 @@
 #![crate_type = "dylib"]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/0.11.0/",
+       html_root_url = "http://doc.rust-lang.org/master/",
        html_playground_url = "http://play.rust-lang.org/")]
 
 #![feature(macro_rules, globs, managed_boxes, linkage)]
@@ -138,7 +138,7 @@ extern crate rustrt;
 #[cfg(test)] pub use realstd::ops;
 #[cfg(test)] pub use realstd::cmp;
 #[cfg(test)] pub use realstd::ty;
-#[cfg(test)] pub use realstd::owned;
+#[cfg(test)] pub use realstd::boxed;
 #[cfg(test)] pub use realstd::gc;
 
 
@@ -167,7 +167,10 @@ pub use core::unit;
 pub use core::result;
 pub use core::option;
 
-pub use alloc::owned;
+pub use alloc::boxed;
+#[deprecated = "use boxed instead"]
+pub use owned = boxed;
+
 pub use alloc::rc;
 
 pub use core_collections::slice;
@@ -285,12 +288,4 @@ mod std {
     #[cfg(test)] pub use os = realstd::os;
     // The test runner requires std::slice::Vector, so re-export std::slice just for it.
     #[cfg(test)] pub use slice;
-}
-
-#[deprecated]
-#[allow(missing_doc)]
-#[doc(hiden)]
-pub mod unstable {
-    #[deprecated = "use std::dynamic_lib"]
-    pub use dynamic_lib;
 }

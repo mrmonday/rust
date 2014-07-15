@@ -22,6 +22,7 @@ use syntax::ast;
 use syntax::ast_util;
 
 use clean;
+use stability_summary::ModuleSummary;
 use html::item_type;
 use html::item_type::ItemType;
 use html::render;
@@ -37,6 +38,8 @@ pub struct FnStyleSpace(pub ast::FnStyle);
 pub struct Method<'a>(pub &'a clean::SelfTy, pub &'a clean::FnDecl);
 /// Similar to VisSpace, but used for mutability
 pub struct MutableSpace(pub clean::Mutability);
+/// Similar to VisSpace, but used for mutability
+pub struct RawMutableSpace(pub clean::Mutability);
 /// Wrapper struct for properly emitting the stability level.
 pub struct Stability<'a>(pub &'a Option<clean::Stability>);
 /// Wrapper struct for emitting the stability level concisely.
@@ -428,7 +431,10 @@ impl fmt::Show for clean::Type {
             }
             clean::Tuple(ref typs) => {
                 primitive_link(f, clean::PrimitiveTuple,
-                               format!("({:#})", typs).as_slice())
+                               match typs.as_slice() {
+                                    [ref one] => format!("({},)", one),
+                                    many => format!("({:#})", many)
+                               }.as_slice())
             }
             clean::Vector(ref t) => {
                 primitive_link(f, clean::Slice, format!("[{}]", **t).as_slice())
@@ -441,7 +447,7 @@ impl fmt::Show for clean::Type {
             clean::Unique(ref t) => write!(f, "Box<{}>", **t),
             clean::Managed(ref t) => write!(f, "Gc<{}>", **t),
             clean::RawPointer(m, ref t) => {
-                write!(f, "*{}{}", MutableSpace(m), **t)
+                write!(f, "*{}{}", RawMutableSpace(m), **t)
             }
             clean::BorrowedRef{ lifetime: ref l, mutability, type_: ref ty} => {
                 let lt = match *l {
@@ -601,6 +607,15 @@ impl fmt::Show for MutableSpace {
     }
 }
 
+impl fmt::Show for RawMutableSpace {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            RawMutableSpace(clean::Immutable) => write!(f, "const "),
+            RawMutableSpace(clean::Mutable) => write!(f, "mut "),
+        }
+    }
+}
+
 impl<'a> fmt::Show for Stability<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Stability(stab) = *self;
@@ -629,5 +644,74 @@ impl<'a> fmt::Show for ConciseStability<'a> {
                 write!(f, "<a class='stability Unmarked' title='No stability level'></a>")
             }
         }
+    }
+}
+
+impl fmt::Show for ModuleSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt_inner<'a>(f: &mut fmt::Formatter,
+                         context: &mut Vec<&'a str>,
+                         m: &'a ModuleSummary)
+                     -> fmt::Result {
+            let cnt = m.counts;
+            let tot = cnt.total();
+            if tot == 0 { return Ok(()) }
+
+            context.push(m.name.as_slice());
+            let path = context.connect("::");
+
+            // the total width of each row's stability summary, in pixels
+            let width = 500;
+
+            try!(write!(f, "<tr>"));
+            try!(write!(f, "<td class='summary'>\
+                            <a class='summary' href='{}'>{}</a></td>",
+                        Vec::from_slice(context.slice_from(1))
+                            .append_one("index.html").connect("/"),
+                        path));
+            try!(write!(f, "<td>"));
+            try!(write!(f, "<span class='summary Stable' \
+                            style='width: {}px; display: inline-block'>&nbsp</span>",
+                        (width * cnt.stable)/tot));
+            try!(write!(f, "<span class='summary Unstable' \
+                            style='width: {}px; display: inline-block'>&nbsp</span>",
+                        (width * cnt.unstable)/tot));
+            try!(write!(f, "<span class='summary Experimental' \
+                            style='width: {}px; display: inline-block'>&nbsp</span>",
+                        (width * cnt.experimental)/tot));
+            try!(write!(f, "<span class='summary Deprecated' \
+                            style='width: {}px; display: inline-block'>&nbsp</span>",
+                        (width * cnt.deprecated)/tot));
+            try!(write!(f, "<span class='summary Unmarked' \
+                            style='width: {}px; display: inline-block'>&nbsp</span>",
+                        (width * cnt.unmarked)/tot));
+            try!(write!(f, "</td></tr>"));
+
+            for submodule in m.submodules.iter() {
+                try!(fmt_inner(f, context, submodule));
+            }
+            context.pop();
+            Ok(())
+        }
+
+        let mut context = Vec::new();
+
+        try!(write!(f,
+r"<h1 class='fqn'>Stability dashboard: crate <a class='mod' href='index.html'>{}</a></h1>
+This dashboard summarizes the stability levels for all of the public modules of
+the crate, according to the total number of items at each level in the module and its children:
+<blockquote>
+<a class='stability Stable'></a> stable,<br/>
+<a class='stability Unstable'></a> unstable,<br/>
+<a class='stability Experimental'></a> experimental,<br/>
+<a class='stability Deprecated'></a> deprecated,<br/>
+<a class='stability Unmarked'></a> unmarked
+</blockquote>
+The counts do not include methods or trait
+implementations that are visible only through a re-exported type.",
+self.name));
+        try!(write!(f, "<table>"))
+        try!(fmt_inner(f, &mut context, self));
+        write!(f, "</table>")
     }
 }
